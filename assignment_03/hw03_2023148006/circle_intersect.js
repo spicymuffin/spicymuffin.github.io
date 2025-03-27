@@ -25,6 +25,7 @@ let shader;
 let vao;
 let positionBuffer; // 2D position을 위한 VBO (Vertex Buffer Object)
 let isDrawing = false; // mouse button을 누르고 있는 동안 true로 change
+let drawPhase = 0;
 let startPoint = null; // mouse button을 누른 위치
 let tempEndPoint = null; // mouse를 움직이는 동안의 위치
 let lines = []; // 그려진 선분들을 저장하는 array
@@ -129,6 +130,25 @@ function convertToWebGLCoordinates(x, y) {
     y = event.clientY - rect.top   // canvas 내에서의 클릭 y 좌표
 */
 
+function getLineSegments(){
+  let tmplines = [];
+  let segments = 300;
+  let radius = Math.sqrt((tempEndPoint[0] - startPoint[0])*(tempEndPoint[0] - startPoint[0]) + 
+  (tempEndPoint[1] - startPoint[1]) * (tempEndPoint[1] - startPoint[1]));
+  
+  // vertices.push(cx, cy); // 원의 중심
+  for (let i = 1; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const angle2 = ((i - 1) / segments) * Math.PI * 2;
+    const px = startPoint[0] + radius * Math.cos(angle2);
+    const py = startPoint[1] + radius * Math.sin(angle2);
+    const x = startPoint[0] + radius * Math.cos(angle);
+    const y = startPoint[1] + radius * Math.sin(angle);
+    tmplines.push([px, py, x, y]);
+  }
+  return tmplines;
+}
+
 function setupMouseEvents() {
   function handleMouseDown(event) {
     event.preventDefault(); // 이미 존재할 수 있는 기본 동작을 방지
@@ -138,7 +158,7 @@ function setupMouseEvents() {
     const x = event.clientX - rect.left; // canvas 내 x 좌표
     const y = event.clientY - rect.top; // canvas 내 y 좌표
 
-    if (!isDrawing && lines.length < 2) {
+    if (!isDrawing && drawPhase < 2) {
       // 1번 또는 2번 선분을 그리고 있는 도중이 아닌 경우 (즉, mouse down 상태가 아닌 경우)
       // 캔버스 좌표를 WebGL 좌표로 변환하여 선분의 시작점을 설정
       let [glX, glY] = convertToWebGLCoordinates(x, y);
@@ -168,45 +188,32 @@ function setupMouseEvents() {
       //     lines = [[1, 2, 3, 4]] 이 됨
       // ex) lines = [[1, 2, 3, 4]] 이고 startPoint = [5, 6], tempEndPoint = [7, 8] 이면,
       //     lines = [[1, 2, 3, 4], [5, 6, 7, 8]] 이 됨
+      
+      if (drawPhase == 1){
+        lines.push([...startPoint, ...tempEndPoint]); 
 
-      lines.push([...startPoint, ...tempEndPoint]);
-
-      if (lines.length == 1) {
-        updateText(
-          textOverlay,
-          "First line segment: (" +
-            lines[0][0].toFixed(2) +
-            ", " +
-            lines[0][1].toFixed(2) +
-            ") ~ (" +
-            lines[0][2].toFixed(2) +
-            ", " +
-            lines[0][3].toFixed(2) +
-            ")"
-        );
-        updateText(
-          textOverlay2,
-          "Click and drag to draw the second line segment"
-        );
-      } else {
-        // lines.length == 2
-        updateText(
-          textOverlay2,
-          "Second line segment: (" +
-            lines[1][0].toFixed(2) +
-            ", " +
-            lines[1][1].toFixed(2) +
-            ") ~ (" +
-            lines[1][2].toFixed(2) +
-            ", " +
-            lines[1][3].toFixed(2) +
-            ")"
-        );
+        if (lines.length == 1) {
+          updateText(textOverlay, "First line segment: (" + lines[0][0].toFixed(2) + ", " + lines[0][1].toFixed(2) + 
+              ") ~ (" + lines[0][2].toFixed(2) + ", " + lines[0][3].toFixed(2) + ")");
+          updateText(textOverlay2, "Click and drag to draw the second line segment");
+        }
+        else { // lines.length == 2
+          updateText(textOverlay2, "Second line segment: (" + lines[1][0].toFixed(2) + ", " + lines[1][1].toFixed(2) + 
+            ") ~ (" + lines[1][2].toFixed(2) + ", " + lines[1][3].toFixed(2) + ")");
+        }
       }
+      else{
+        let circleLines = getLineSegments();
+        for(let i = 0; i < circleLines.length; i++){
+          lines.push(circleLines[i]);
+        }
+      }
+
 
       isDrawing = false;
       startPoint = null;
       tempEndPoint = null;
+      drawPhase++;
       render();
     }
   }
@@ -226,7 +233,7 @@ function render() {
   // 저장된 선들 그리기
   let num = 0;
   for (let line of lines) {
-    if (num == 0) {
+    if (num < 300) {
       // 첫 번째 선분인 경우, yellow
       shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);
     } else {
@@ -242,13 +249,34 @@ function render() {
   // 임시 선 그리기
   if (isDrawing && startPoint && tempEndPoint) {
     shader.setVec4("u_color", [0.5, 0.5, 0.5, 1.0]); // 임시 선분의 color는 회색
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([...startPoint, ...tempEndPoint]),
-      gl.STATIC_DRAW
-    );
-    gl.bindVertexArray(vao);
-    gl.drawArrays(gl.LINES, 0, 2);
+
+    if (drawPhase == 0){
+      let circleLines = getLineSegments();
+      let tmpLineArray = [];
+      for(let i = 0; i < circleLines.length; i++){
+        tmpLineArray.push(circleLines[i][0]);
+        tmpLineArray.push(circleLines[i][1]);
+        tmpLineArray.push(circleLines[i][2]);
+        tmpLineArray.push(circleLines[i][3]);
+      }
+      
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(tmpLineArray),
+        gl.STATIC_DRAW
+      );
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.LINES, 0, 600);
+    }
+    else if (drawPhase == 1){
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([...startPoint, ...tempEndPoint]),
+        gl.STATIC_DRAW
+      );
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.LINES, 0, 2);
+    }
   }
 
   // axes 그리기
