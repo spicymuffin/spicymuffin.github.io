@@ -32,6 +32,48 @@ let textOverlay; // 1st line segment 정보 표시
 let textOverlay2; // 2nd line segment 정보 표시
 let axes = new Axes(gl, 0.85); // x, y axes 그려주는 object (see util.js)
 
+function interval_endpoints_to_parametric(x1, y1, x2, y2) {
+  x_parametric_slope = x1;
+  x_parametric_offset = x2 - x1;
+  y_parametric_slope = y1;
+  y_parametric_offset = y2 - y1;
+  return [
+    x_parametric_slope,
+    x_parametric_offset,
+    y_parametric_slope,
+    y_parametric_offset,
+  ];
+}
+
+function get_intersect_quadeq_coefficients(
+  x_parametric_slope,
+  x_parametric_offset,
+  y_parametric_slope,
+  y_parametric_offset,
+  circle_center_x,
+  circle_center_y,
+  radius
+) {
+  a =
+    x_parametric_slope * x_parametric_slope +
+    y_parametric_slope * y_parametric_slope;
+  b =
+    2 *
+    (x_parametric_slope * x_parametric_offset -
+      x_parametric_slope * circle_center_x +
+      y_parametric_slope * y_parametric_offset -
+      y_parametric_slope * circle_center_y);
+  c =
+    y_parametric_offset * y_parametric_offset +
+    x_parametric_offset * x_parametric_offset +
+    circle_center_x * circle_center_x +
+    circle_center_y * circle_center_y -
+    radius * radius -
+    2 *
+      (x_parametric_offset * circle_center_x +
+        y_parametric_offset * circle_center_y);
+}
+
 // DOMContentLoaded event
 // 1) 모든 HTML 문서가 완전히 load되고 parsing된 후 발생
 // 2) 모든 resource (images, css, js 등) 가 완전히 load된 후 발생
