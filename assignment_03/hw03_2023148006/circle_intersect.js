@@ -186,7 +186,7 @@ function getLineSegments(){
     const py = startPoint[1] + radius * Math.sin(angle2);
     const x = startPoint[0] + radius * Math.cos(angle);
     const y = startPoint[1] + radius * Math.sin(angle);
-    tmplines.push([px, py, x, y]);
+    tmplines.push(px, py, x, y);
   }
   return tmplines;
 }
@@ -246,9 +246,7 @@ function setupMouseEvents() {
       }
       else{
         let circleLines = getLineSegments();
-        for(let i = 0; i < circleLines.length; i++){
-          lines.push(circleLines[i]);
-        }
+        lines.push(circleLines);
       }
 
 
@@ -275,16 +273,18 @@ function render() {
   // 저장된 선들 그리기
   let num = 0;
   for (let line of lines) {
-    if (num < 300) {
-      // 첫 번째 선분인 경우, yellow
+    let sz = 0;
+    if (num == 0){
       shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);
-    } else {
-      // num == 1 (2번째 선분인 경우), red
+      sz = 300;
+    }
+    if (num == 1) {
       shader.setVec4("u_color", [1.0, 0.0, 1.0, 1.0]);
+      sz = 1;
     }
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(line), gl.STATIC_DRAW);
     gl.bindVertexArray(vao);
-    gl.drawArrays(gl.LINES, 0, 2);
+    gl.drawArrays(gl.LINES, 0, sz * 2);
     num++;
   }
 
@@ -294,17 +294,10 @@ function render() {
 
     if (drawPhase == 0){
       let circleLines = getLineSegments();
-      let tmpLineArray = [];
-      for(let i = 0; i < circleLines.length; i++){
-        tmpLineArray.push(circleLines[i][0]);
-        tmpLineArray.push(circleLines[i][1]);
-        tmpLineArray.push(circleLines[i][2]);
-        tmpLineArray.push(circleLines[i][3]);
-      }
-      
+
       gl.bufferData(
         gl.ARRAY_BUFFER,
-        new Float32Array(tmpLineArray),
+        new Float32Array(circleLines),
         gl.STATIC_DRAW
       );
       gl.bindVertexArray(vao);
