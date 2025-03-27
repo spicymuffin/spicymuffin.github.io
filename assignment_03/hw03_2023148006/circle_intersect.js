@@ -16,6 +16,7 @@ import {
   Axes,
 } from "../../util/util.js";
 import { Shader, readShaderFile } from "../../util/shader.js";
+import { quadeq_solve, quadeq_n_roots } from "./quadeq_solver.js";
 
 // Global variables
 const canvas = document.getElementById("glCanvas");
