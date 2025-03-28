@@ -35,12 +35,10 @@ let textOverlay; // 1st line segment 정보 표시
 let textOverlay2; // 2nd line segment 정보 표시
 let axes = new Axes(gl, 0.85); // x, y axes 그려주는 object (see util.js)
 let radius = 0;
-let intersection_num = 0;
 let lines_seg = []; // 선분
 let circle_center = [];
 let xs = []; // 교점 x좌표
 let ys = []; // 교점 y좌표
-
 
 function interval_endpoints_to_parametric(x1, y1, x2, y2) {
   let x_parametric_slope = x2 - x1;
@@ -83,7 +81,7 @@ function get_intersect_quadeq_coefficients(
       (x_parametric_offset * circle_center_x +
         y_parametric_offset * circle_center_y);
 
-    return [a, b, c];
+  return [a, b, c];
 }
 
 // DOMContentLoaded event
@@ -183,12 +181,14 @@ function convertToWebGLCoordinates(x, y) {
     y = event.clientY - rect.top   // canvas 내에서의 클릭 y 좌표
 */
 
-function getLineSegments(){
+function getLineSegments() {
   let tmplines = [];
   let segments = 300;
-  radius = Math.sqrt((tempEndPoint[0] - startPoint[0])*(tempEndPoint[0] - startPoint[0]) + 
-  (tempEndPoint[1] - startPoint[1]) * (tempEndPoint[1] - startPoint[1]));
-  
+  radius = Math.sqrt(
+    (tempEndPoint[0] - startPoint[0]) * (tempEndPoint[0] - startPoint[0]) +
+      (tempEndPoint[1] - startPoint[1]) * (tempEndPoint[1] - startPoint[1])
+  );
+
   // vertices.push(cx, cy); // 원의 중심
   for (let i = 1; i <= segments; i++) {
     const angle = (i / segments) * Math.PI * 2;
@@ -216,7 +216,7 @@ function setupMouseEvents() {
       // 캔버스 좌표를 WebGL 좌표로 변환하여 선분의 시작점을 설정
       let [glX, glY] = convertToWebGLCoordinates(x, y);
       startPoint = [glX, glY];
-      if(drawPhase == 0){
+      if (drawPhase == 0) {
         circle_center = [glX, glY];
       }
       isDrawing = true; // 이제 mouse button을 놓을 때까지 계속 true로 둠. 즉, mouse down 상태가 됨
@@ -244,17 +244,32 @@ function setupMouseEvents() {
       //     lines = [[1, 2, 3, 4]] 이 됨
       // ex) lines = [[1, 2, 3, 4]] 이고 startPoint = [5, 6], tempEndPoint = [7, 8] 이면,
       //     lines = [[1, 2, 3, 4], [5, 6, 7, 8]] 이 됨
-      
-      if (drawPhase == 1){
-        lines.push([...startPoint, ...tempEndPoint]); 
+
+      if (drawPhase == 1) {
+        lines.push([...startPoint, ...tempEndPoint]);
         lines_seg.push([...startPoint, ...tempEndPoint]);
 
-        updateText(textOverlay2, "Line segment: (" + lines_seg[0][0].toFixed(2) + ", " + lines_seg[0][1].toFixed(2) + 
-          ") ~ (" + lines_seg[0][2].toFixed(2) + ", " + lines_seg[0][3].toFixed(2) + ")");
-        
-          // 교점 구하기
-        let params = interval_endpoints_to_parametric(lines_seg[0][0], lines_seg[0][1], lines_seg[0][2], lines_seg[0][3]);
-        
+        updateText(
+          textOverlay2,
+          "Line segment: (" +
+            lines_seg[0][0].toFixed(2) +
+            ", " +
+            lines_seg[0][1].toFixed(2) +
+            ") ~ (" +
+            lines_seg[0][2].toFixed(2) +
+            ", " +
+            lines_seg[0][3].toFixed(2) +
+            ")"
+        );
+
+        // 교점 구하기
+        let params = interval_endpoints_to_parametric(
+          lines_seg[0][0],
+          lines_seg[0][1],
+          lines_seg[0][2],
+          lines_seg[0][3]
+        );
+
         let coeff = get_intersect_quadeq_coefficients(
           ...params,
           circle_center[0],
@@ -263,46 +278,67 @@ function setupMouseEvents() {
         );
 
         xs = quadeq_solve(...coeff);
-        intersection_num = quadeq_n_roots(...coeff);
 
-        for (let i = 0; i < xs.length; i++){
-          if (0 <= xs[i] && xs[i] <= 1){
-            let xpos = lines_seg[0][0] + xs[i] * (lines_seg[0][2] - lines_seg[0][0]);
-            let ypos = lines_seg[0][1] + xs[i] * (lines_seg[0][3] - lines_seg[0][1]);
+        for (let i = 0; i < xs.length; i++) {
+          if (0 <= xs[i] && xs[i] <= 1) {
+            let xpos =
+              lines_seg[0][0] + xs[i] * (lines_seg[0][2] - lines_seg[0][0]);
+            let ypos =
+              lines_seg[0][1] + xs[i] * (lines_seg[0][3] - lines_seg[0][1]);
             intersect_pos.push([xpos, ypos]);
             console.log(xs[i], xpos.toFixed(2), ypos.toFixed(2));
           }
         }
 
-       // console.log(intersection_num);
-        
+        // console.log(intersection_num);
 
-        if(intersect_pos.length == 2){
+        if (intersect_pos.length == 2) {
           // ys[0] = (lines_seg[0][1] * (1 - xs[0]) + lines_seg[0][3] * xs[0]).toFixed(2); //y좌표 계산
           //ys[1] = (lines_seg[0][1] * (1 - xs[1]) + lines_seg[0][3] * xs[1]).toFixed(2);
 
-          setupText(canvas, "Intersection Points: 2 Point 1: (" + 
-            intersect_pos[0][0].toFixed(2) + ", " + intersect_pos[0][1].toFixed(2) + ") Point 2: (" +
-            intersect_pos[1][0].toFixed(2) + ", " + intersect_pos[0][1].toFixed(2) + ")" , 3);
+          setupText(
+            canvas,
+            "Intersection Points: 2 Point 1: (" +
+              intersect_pos[0][0].toFixed(2) +
+              ", " +
+              intersect_pos[0][1].toFixed(2) +
+              ") Point 2: (" +
+              intersect_pos[1][0].toFixed(2) +
+              ", " +
+              intersect_pos[0][1].toFixed(2) +
+              ")",
+            3
+          );
           //render();
-        }
-        else if(intersect_pos.length == 1){
+        } else if (intersect_pos.length == 1) {
           //ys[0] = (lines_seg[0][1] * (1 - xs[0]) + lines_seg[0][3] * xs[0]).toFixed(2);
 
-          setupText(canvas, "Intersection Points: 1 Point 1: (" + 
-            intersect_pos[0][0].toFixed(2) + ", " + intersect_pos[0][1].toFixed(2) + ")", 3);
+          setupText(
+            canvas,
+            "Intersection Points: 1 Point 1: (" +
+              intersect_pos[0][0].toFixed(2) +
+              ", " +
+              intersect_pos[0][1].toFixed(2) +
+              ")",
+            3
+          );
           //render();
-        }
-        else{
+        } else {
           setupText(canvas, "No intersection", 3);
         }
-      }
-      else{
+      } else {
         let circleLines = getLineSegments();
         lines.push(circleLines);
 
-        updateText(textOverlay, "Circle: center (" + circle_center[0].toFixed(2) + ", " + circle_center[1].toFixed(2) + 
-              ") radius = " + radius.toFixed(2));
+        updateText(
+          textOverlay,
+          "Circle: center (" +
+            circle_center[0].toFixed(2) +
+            ", " +
+            circle_center[1].toFixed(2) +
+            ") radius = " +
+            radius.toFixed(2)
+        );
         //  updateText(textOverlay2, "Click and drag to draw the second line segment");
       }
 
@@ -330,7 +366,7 @@ function render() {
   let num = 0;
   for (let line of lines) {
     let sz = 0;
-    if (num == 0){
+    if (num == 0) {
       shader.setVec4("u_color", [1.0, 0.0, 1.0, 1.0]);
       sz = 300;
     }
@@ -348,9 +384,8 @@ function render() {
   if (isDrawing && startPoint && tempEndPoint) {
     shader.setVec4("u_color", [0.5, 0.5, 0.5, 1.0]); // 임시 선분의 color는 회색
 
-    if (drawPhase == 0){
+    if (drawPhase == 0) {
       let circleLines = getLineSegments();
-
       gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array(circleLines),
@@ -358,8 +393,7 @@ function render() {
       );
       gl.bindVertexArray(vao);
       gl.drawArrays(gl.LINES, 0, 600);
-    }
-    else if (drawPhase == 1){
+    } else if (drawPhase == 1) {
       gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array([...startPoint, ...tempEndPoint]),
@@ -371,18 +405,25 @@ function render() {
   }
 
   // 교점 점 찍기
-  if(intersect_pos.length == 2){
+  if (intersect_pos.length == 2) {
     console.log("in");
-    shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);   
+    shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);
     let intersectionVertices = [...intersect_pos[0], ...intersect_pos[1]];
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(intersectionVertices), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array(intersectionVertices),
+      gl.STATIC_DRAW
+    );
     gl.bindVertexArray(vao);
     gl.drawArrays(gl.POINTS, 0, 2);
-    }
-  else if(intersect_pos.length == 1){
-    shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);   
+  } else if (intersect_pos.length == 1) {
+    shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);
     let intersectionVertices = [...intersect_pos[0]];
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(intersectionVertices), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array(intersectionVertices),
+      gl.STATIC_DRAW
+    );
     gl.bindVertexArray(vao);
     gl.drawArrays(gl.POINTS, 0, 1);
   }
@@ -413,9 +454,7 @@ async function main() {
 
     // 텍스트 초기화
     textOverlay = setupText(canvas, "", 1);
-    textOverlay2 = setupText(
-      canvas, "", 2
-    );
+    textOverlay2 = setupText(canvas, "", 2);
 
     // 마우스 이벤트 설정
     setupMouseEvents();
