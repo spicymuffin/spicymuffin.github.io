@@ -30,6 +30,7 @@ let drawPhase = 0;
 let startPoint = null; // mouse button을 누른 위치
 let tempEndPoint = null; // mouse를 움직이는 동안의 위치
 let lines = []; // 그려진 선분들을 저장하는 array
+let intersect_pos = [];
 let textOverlay; // 1st line segment 정보 표시
 let textOverlay2; // 2nd line segment 정보 표시
 let axes = new Axes(gl, 0.85); // x, y axes 그려주는 object (see util.js)
@@ -248,7 +249,7 @@ function setupMouseEvents() {
         lines.push([...startPoint, ...tempEndPoint]); 
         lines_seg.push([...startPoint, ...tempEndPoint]);
 
-        updateText(textOverlay2, "Second line segment: (" + lines_seg[0][0].toFixed(2) + ", " + lines_seg[0][1].toFixed(2) + 
+        updateText(textOverlay2, "Line segment: (" + lines_seg[0][0].toFixed(2) + ", " + lines_seg[0][1].toFixed(2) + 
           ") ~ (" + lines_seg[0][2].toFixed(2) + ", " + lines_seg[0][3].toFixed(2) + ")");
         
           // 교점 구하기
@@ -264,36 +265,46 @@ function setupMouseEvents() {
         xs = quadeq_solve(...coeff);
         intersection_num = quadeq_n_roots(...coeff);
 
-        console.log(intersection_num);
-
-        if(intersection_num == 2){
-          ys[0] = (lines_seg[0][1] * (1 - xs[0]) + lines_seg[0][3] * xs[0]).toFixed(2); //y좌표 계산
-          ys[1] = (lines_seg[0][1] * (1 - xs[1]) + lines_seg[0][3] * xs[1]).toFixed(2);
-
-          setupText(canvas, "Intersection Points: 2 Point 1: (" + 
-            xs[0].toFixed(2) + ", " + ys[0] + ") Point 2: (" +
-            xs[1].toFixed(2) + ", " + ys[1] + ")" , 3);
-          render();
+        for (let i = 0; i < xs.length; i++){
+          if (0 <= xs[i] && xs[i] <= 1){
+            let xpos = lines_seg[0][0] + xs[i] * (lines_seg[0][2] - lines_seg[0][0]);
+            let ypos = lines_seg[0][1] + xs[i] * (lines_seg[0][3] - lines_seg[0][1]);
+            intersect_pos.push([xpos, ypos]);
+            console.log(xs[i], xpos.toFixed(2), ypos.toFixed(2));
+          }
         }
-        else if(intersection_num == 1){
-          ys[0] = (lines_seg[0][1] * (1 - xs[0]) + lines_seg[0][3] * xs[0]).toFixed(2);
+
+       // console.log(intersection_num);
+        
+
+        if(intersect_pos.length == 2){
+          // ys[0] = (lines_seg[0][1] * (1 - xs[0]) + lines_seg[0][3] * xs[0]).toFixed(2); //y좌표 계산
+          //ys[1] = (lines_seg[0][1] * (1 - xs[1]) + lines_seg[0][3] * xs[1]).toFixed(2);
 
           setupText(canvas, "Intersection Points: 2 Point 1: (" + 
-            xs[0].toFixed(2) + ", " + ys[0] + ")", 3);
-          render();
+            intersect_pos[0][0].toFixed(2) + ", " + intersect_pos[0][1].toFixed(2) + ") Point 2: (" +
+            intersect_pos[1][0].toFixed(2) + ", " + intersect_pos[0][1].toFixed(2) + ")" , 3);
+          //render();
+        }
+        else if(intersect_pos.length == 1){
+          //ys[0] = (lines_seg[0][1] * (1 - xs[0]) + lines_seg[0][3] * xs[0]).toFixed(2);
+
+          setupText(canvas, "Intersection Points: 1 Point 1: (" + 
+            intersect_pos[0][0].toFixed(2) + ", " + intersect_pos[0][1].toFixed(2) + ")", 3);
+          //render();
         }
         else{
           setupText(canvas, "No intersection", 3);
         }
-        }
+      }
       else{
         let circleLines = getLineSegments();
         lines.push(circleLines);
 
-        updateText(textOverlay, "Circle: (" + circle_center[0].toFixed(2) + ", " + circle_center[1].toFixed(2) + 
+        updateText(textOverlay, "Circle: center (" + circle_center[0].toFixed(2) + ", " + circle_center[1].toFixed(2) + 
               ") radius = " + radius.toFixed(2));
-          updateText(textOverlay2, "Click and drag to draw the second line segment");
-        }
+        //  updateText(textOverlay2, "Click and drag to draw the second line segment");
+      }
 
       isDrawing = false;
       startPoint = null;
@@ -360,17 +371,17 @@ function render() {
   }
 
   // 교점 점 찍기
-  if(intersection_num == 2){
+  if(intersect_pos.length == 2){
     console.log("in");
     shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);   
-    let intersectionVertices = [xs[0], ys[0], xs[1], ys[1]];
+    let intersectionVertices = [...intersect_pos[0], ...intersect_pos[1]];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(intersectionVertices), gl.STATIC_DRAW);
     gl.bindVertexArray(vao);
     gl.drawArrays(gl.POINTS, 0, 2);
     }
-  else if(intersection_num){
+  else if(intersect_pos.length == 1){
     shader.setVec4("u_color", [1.0, 1.0, 0.0, 1.0]);   
-    let intersectionVertices = [xs[0], ys[0]];
+    let intersectionVertices = [...intersect_pos[0]];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(intersectionVertices), gl.STATIC_DRAW);
     gl.bindVertexArray(vao);
     gl.drawArrays(gl.POINTS, 0, 1);
@@ -401,11 +412,9 @@ async function main() {
     shader.use();
 
     // 텍스트 초기화
-    textOverlay = setupText(canvas, "No line segment", 1);
+    textOverlay = setupText(canvas, "", 1);
     textOverlay2 = setupText(
-      canvas,
-      "Click mouse button and drag to draw line segments",
-      2
+      canvas, "", 2
     );
 
     // 마우스 이벤트 설정
