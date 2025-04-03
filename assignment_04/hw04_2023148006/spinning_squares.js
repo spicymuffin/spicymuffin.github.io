@@ -45,6 +45,15 @@ let moon_transform;
 const earth_rev_radius = 0.7;
 const moon_rev_radius = 0.2;
 
+// spec says sun red earth cyan moon yellow
+const sun_color = [1.0, 0.0, 0.0, 1.0]; // red
+const earth_color = [0.0, 1.0, 1.0, 1.0]; // cyan
+const moon_color = [1.0, 1.0, 0.0, 1.0]; // yellow
+
+const sun_scale = [0.2, 0.2, 1.0];
+const earth_scale = [0.1, 0.1, 1.0];
+const moon_scale = [0.05, 0.05, 1.0];
+
 document.addEventListener("DOMContentLoaded", () => {
   if (isInitialized) {
     console.log("Already initialized");
@@ -82,14 +91,14 @@ function initWebGL() {
 
 function setupBuffers() {
   const cubeVertices = new Float32Array([
-    -0.15,
-    0.15, // 좌상단
-    -0.15,
-    -0.15, // 좌하단
-    0.15,
-    -0.15, // 우하단
-    0.15,
-    0.15, // 우상단
+    -1,
+    1, // 좌상단
+    -1,
+    -1, // 좌하단
+    1,
+    -1, // 우하단
+    1,
+    1, // 우상단
   ]);
 
   const indices = new Uint16Array([
@@ -101,24 +110,6 @@ function setupBuffers() {
     3, // 두 번째 삼각형
   ]);
 
-  const cubeColors = new Float32Array([
-    1.0,
-    0.0,
-    0.0,
-    1.0, // 빨간색
-    1.0,
-    0.0,
-    0.0,
-    1.0,
-    1.0,
-    0.0,
-    0.0,
-    1.0,
-    1.0,
-    0.0,
-    0.0,
-    1.0,
-  ]);
 
   vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
@@ -129,30 +120,12 @@ function setupBuffers() {
   gl.bufferData(gl.ARRAY_BUFFER, cubeVertices, gl.STATIC_DRAW);
   shader.setAttribPointer("a_position", 2, gl.FLOAT, false, 0, 0);
 
-  // VBO for color
-  const colorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, cubeColors, gl.STATIC_DRAW);
-  shader.setAttribPointer("a_color", 4, gl.FLOAT, false, 0, 0);
-
   // EBO
   const indexBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
   gl.bindVertexArray(null);
-}
-
-function getTransformMatrices() {
-  const T = mat4.create();
-  const R = mat4.create();
-  const S = mat4.create();
-
-  mat4.translate(T, T, [0.5, 0.5, 0]); // translation by (0.5, 0.5)
-  mat4.rotate(R, R, rotationAngle, [0, 0, 1]); // rotation about z-axis
-  mat4.scale(S, S, [0.3, 0.3, 1]); // scale by (0.3, 0.3)
-
-  return { T, R, S };
 }
 
 function applyTransform(type) {
@@ -162,6 +135,8 @@ function applyTransform(type) {
 
   // sun rotate
   mat4.rotate(sun_transform, sun_transform, sun_rot, [0, 0, 1]);
+  // sun scale
+  mat4.scale(sun_transform, sun_transform, sun_scale);
 
   // earth revelove
   mat4.rotate(earth_transform, earth_transform, earth_rev, [0, 0, 1]);
@@ -169,15 +144,21 @@ function applyTransform(type) {
   mat4.translate(earth_transform, earth_transform, [earth_rev_radius, 0, 0]);
   // earth rotate
   mat4.rotate(earth_transform, earth_transform, earth_rot, [0, 0, 1]);
+  // earth scale
+  mat4.scale(earth_transform, earth_transform, earth_scale);
 
-  // moon revolve
+  // moon revolve (relative to sun)
+  mat4.rotate(moon_transform, moon_transform, earth_rev, [0, 0, 1]);
+  // moon transpose (relative to sun)
+  mat4.translate(moon_transform, moon_transform, [earth_rev_radius, 0, 0]);
+  // moon revolve (relative to earth)
   mat4.rotate(moon_transform, moon_transform, moon_rev, [0, 0, 1]);
   // moon transpose (relative to earth)
   mat4.translate(moon_transform, moon_transform, [moon_rev_radius, 0, 0]);
-  // moon transpose (relative to sun)
-  mat4.translate(moon_transform, moon_transform, [earth_rev_radius, 0, 0]);
   // moon rotate
   mat4.rotate(moon_transform, moon_transform, moon_rot, [0, 0, 1]);
+  // moon scale
+  mat4.scale(moon_transform, moon_transform, moon_scale);
 }
 
 function render() {
@@ -192,12 +173,15 @@ function render() {
   gl.bindVertexArray(vao);
 
   shader.setMat4("u_transform", sun_transform);
+  shader.setVec4("u_color", sun_color);
   gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
   shader.setMat4("u_transform", earth_transform);
+  shader.setVec4("u_color", earth_color);
   gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
   shader.setMat4("u_transform", moon_transform);
+  shader.setVec4("u_color", moon_color);
   gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
   // shader.setMat4("u_transform", mat4.create()); // reset transform
 }
@@ -205,17 +189,21 @@ function render() {
 function animate(currentTime) {
   if (!lastTime) lastTime = currentTime; // if lastTime == 0
   // deltaTime: 이전 frame에서부터의 elapsed time (in seconds)
-  const deltaTime = (currentTime - lastTime) / 1000;
+  let deltaTime = (currentTime - lastTime) / 1000;
   lastTime = currentTime;
+
+  // change to 10 if you want to have fun
+  deltaTime *= 1;
 
   // 2초당 1회전, 즉, 1초당 180도 회전
   rotationAngle += Math.PI * deltaTime;
 
   sun_rot += (Math.PI / 4) * deltaTime; // 1초당 45도 자전
-  earth_rot += Math.PI * deltaTime; // 1초당 180도 자전
-  moon_rot += Math.PI * deltaTime; // 1초당 180도 자전
 
+  earth_rot += Math.PI * deltaTime; // 1초당 180도 자전
   earth_rev += (Math.PI / 6) * deltaTime; // 1초당 30도 공전
+
+  moon_rot += Math.PI * deltaTime; // 1초당 180도 자전
   moon_rev += Math.PI * 2 * deltaTime; // 1초당 360도 공전
   applyTransform(currentTransformType);
 
