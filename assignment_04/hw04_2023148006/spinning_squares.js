@@ -91,14 +91,14 @@ function initWebGL() {
 
 function setupBuffers() {
   const cubeVertices = new Float32Array([
-    -1,
-    1, // 좌상단
-    -1,
-    -1, // 좌하단
-    1,
-    -1, // 우하단
-    1,
-    1, // 우상단
+    -0.5,
+    0.5, // 좌상단
+    -0.5,
+    -0.5, // 좌하단
+    0.5,
+    -0.5, // 우하단
+    0.5,
+    0.5, // 우상단
   ]);
 
   const indices = new Uint16Array([
@@ -195,16 +195,13 @@ function animate(currentTime) {
   // change to 10 if you want to have fun
   deltaTime *= 1;
 
-  // 2초당 1회전, 즉, 1초당 180도 회전
-  rotationAngle += Math.PI * deltaTime;
-
   sun_rot += (Math.PI / 4) * deltaTime; // 1초당 45도 자전
 
   earth_rot += Math.PI * deltaTime; // 1초당 180도 자전
   earth_rev += (Math.PI / 6) * deltaTime; // 1초당 30도 공전
 
   moon_rot += Math.PI * deltaTime; // 1초당 180도 자전
-  moon_rev += Math.PI * 2 * deltaTime; // 1초당 360도 공전
+  moon_rev += (Math.PI * 2) * deltaTime; // 1초당 360도 공전
   applyTransform(currentTransformType);
 
   render();
