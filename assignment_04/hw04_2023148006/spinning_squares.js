@@ -15,8 +15,8 @@ canvas의 중심에 한 edge의 길이가 0.3인 정사각형을 그리고,
     keyboard 6은 SRT 순서로 적용
     keyboard 7은 원래 위치로 돌아옴
 ---------------------------------------------------------------------------*/
-import { resizeAspectRatio, Axes } from "../util/util.js";
-import { Shader, readShaderFile } from "../util/shader.js";
+import { resizeAspectRatio, Axes } from "../../util/util.js";
+import { Shader, readShaderFile } from "../../util/shader.js";
 
 let isInitialized = false;
 const canvas = document.getElementById("glCanvas");
@@ -37,6 +37,13 @@ let moon_rot = 0;
 
 let earth_rev = 0;
 let moon_rev = 0;
+
+let sun_transform;
+let earth_transform;
+let moon_transform;
+
+const earth_rev_radius = 0.7;
+const moon_rev_radius = 0.2;
 
 document.addEventListener("DOMContentLoaded", () => {
   if (isInitialized) {
@@ -149,27 +156,28 @@ function getTransformMatrices() {
 }
 
 function applyTransform(type) {
-  finalTransform = mat4.create();
-  const { T, R, S } = getTransformMatrices();
+  sun_transform = mat4.create();
+  earth_transform = mat4.create();
+  moon_transform = mat4.create();
 
-  const transformOrder = {
-    TRS: [T, R, S],
-    TSR: [T, S, R],
-    RTS: [R, T, S],
-    RST: [R, S, T],
-    STR: [S, T, R],
-    SRT: [S, R, T],
-  };
+  // sun rotate
+  mat4.rotate(sun_transform, sun_transform, sun_rot, [0, 0, 1]);
 
-  /*
-      type은 'TRS', 'TSR', 'RTS', 'RST', 'STR', 'SRT' 중 하나
-      array.forEach(...) : 각 type의 element T or R or S 에 대해 반복
-    */
-  if (transformOrder[type]) {
-    transformOrder[type].forEach((matrix) => {
-      mat4.multiply(finalTransform, matrix, finalTransform);
-    });
-  }
+  // earth revelove
+  mat4.rotate(earth_transform, earth_transform, earth_rev, [0, 0, 1]);
+  // earth transpose
+  mat4.translate(earth_transform, earth_transform, [earth_rev_radius, 0, 0]);
+  // earth rotate
+  mat4.rotate(earth_transform, earth_transform, earth_rot, [0, 0, 1]);
+
+  // moon revolve
+  mat4.rotate(moon_transform, moon_transform, moon_rev, [0, 0, 1]);
+  // moon transpose (relative to earth)
+  mat4.translate(moon_transform, moon_transform, [moon_rev_radius, 0, 0]);
+  // moon transpose (relative to sun)
+  mat4.translate(moon_transform, moon_transform, [earth_rev_radius, 0, 0]);
+  // moon rotate
+  mat4.rotate(moon_transform, moon_transform, moon_rot, [0, 0, 1]);
 }
 
 function render() {
@@ -180,12 +188,18 @@ function render() {
 
   // draw cube
   shader.use();
-  shader.setMat4("u_transform", finalTransform);
+
   gl.bindVertexArray(vao);
-  // gl.drawElements(mode, index_count, type, byte_offset);
+
+  shader.setMat4("u_transform", sun_transform);
   gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
-  shader.setMat4("u_transform", mat4.create()); // reset transform
+  shader.setMat4("u_transform", earth_transform);
+  gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+  shader.setMat4("u_transform", moon_transform);
+  gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+  // shader.setMat4("u_transform", mat4.create()); // reset transform
 }
 
 function animate(currentTime) {
@@ -194,18 +208,17 @@ function animate(currentTime) {
   const deltaTime = (currentTime - lastTime) / 1000;
   lastTime = currentTime;
 
-  if (isAnimating && currentTransformType) {
-    // 2초당 1회전, 즉, 1초당 180도 회전
-    rotationAngle += Math.PI * deltaTime;
+  // 2초당 1회전, 즉, 1초당 180도 회전
+  rotationAngle += Math.PI * deltaTime;
 
-    sun_rot += (Math.PI / 4) * deltaTime; // 1초당 45도 자전
-    earth_rot += Math.PI * deltaTime; // 1초당 180도 자전
-    moon_rot += Math.PI * deltaTime; // 1초당 180도 자전
+  sun_rot += (Math.PI / 4) * deltaTime; // 1초당 45도 자전
+  earth_rot += Math.PI * deltaTime; // 1초당 180도 자전
+  moon_rot += Math.PI * deltaTime; // 1초당 180도 자전
 
-    earth_rev += (Math.PI / 6) * deltaTime; // 1초당 30도 공전
-    moon_rev += Math.PI * 2 * deltaTime; // 1초당 360도 공전
-    applyTransform(currentTransformType);
-  }
+  earth_rev += (Math.PI / 6) * deltaTime; // 1초당 30도 공전
+  moon_rev += Math.PI * 2 * deltaTime; // 1초당 360도 공전
+  applyTransform(currentTransformType);
+
   render();
 
   requestAnimationFrame(animate);
@@ -223,7 +236,11 @@ async function main() {
       throw new Error("WebGL 초기화 실패");
     }
 
-    finalTransform = mat4.create();
+    // finalTransform = mat4.create();
+
+    sun_transform = mat4.create();
+    earth_transform = mat4.create();
+    moon_transform = mat4.create();
 
     await initShader();
 
