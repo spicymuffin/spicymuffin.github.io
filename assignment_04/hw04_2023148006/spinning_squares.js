@@ -15,12 +15,7 @@ canvas의 중심에 한 edge의 길이가 0.3인 정사각형을 그리고,
     keyboard 6은 SRT 순서로 적용
     keyboard 7은 원래 위치로 돌아옴
 ---------------------------------------------------------------------------*/
-import {
-  resizeAspectRatio,
-  setupText,
-  updateText,
-  Axes,
-} from "../util/util.js";
+import { resizeAspectRatio, Axes } from "../util/util.js";
 import { Shader, readShaderFile } from "../util/shader.js";
 
 let isInitialized = false;
@@ -34,7 +29,14 @@ let rotationAngle = 0;
 let currentTransformType = null;
 let isAnimating = false;
 let lastTime = 0;
-let textOverlay;
+
+// rotation angles
+let sun_rot = 0;
+let earth_rot = 0;
+let moon_rot = 0;
+
+let earth_rev = 0;
+let moon_rev = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   if (isInitialized) {
@@ -134,50 +136,6 @@ function setupBuffers() {
   gl.bindVertexArray(null);
 }
 
-function setupKeyboardEvents() {
-  let key;
-  document.addEventListener("keydown", (event) => {
-    key = event.key;
-    switch (key) {
-      case "1":
-        currentTransformType = "TRS";
-        isAnimating = true;
-        break;
-      case "2":
-        currentTransformType = "TSR";
-        isAnimating = true;
-        break;
-      case "3":
-        currentTransformType = "RTS";
-        isAnimating = true;
-        break;
-      case "4":
-        currentTransformType = "RST";
-        isAnimating = true;
-        break;
-      case "5":
-        currentTransformType = "STR";
-        isAnimating = true;
-        break;
-      case "6":
-        currentTransformType = "SRT";
-        isAnimating = true;
-        break;
-      case "7":
-        currentTransformType = null;
-        isAnimating = false;
-        rotationAngle = 0;
-        finalTransform = mat4.create();
-        break;
-    }
-    if (currentTransformType) {
-      updateText(textOverlay, event.key + ": " + currentTransformType);
-    } else {
-      updateText(textOverlay, "NO TRANSFORMA1TION");
-    }
-  });
-}
-
 function getTransformMatrices() {
   const T = mat4.create();
   const R = mat4.create();
@@ -226,6 +184,8 @@ function render() {
   gl.bindVertexArray(vao);
   // gl.drawElements(mode, index_count, type, byte_offset);
   gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+  shader.setMat4("u_transform", mat4.create()); // reset transform
 }
 
 function animate(currentTime) {
@@ -237,6 +197,13 @@ function animate(currentTime) {
   if (isAnimating && currentTransformType) {
     // 2초당 1회전, 즉, 1초당 180도 회전
     rotationAngle += Math.PI * deltaTime;
+
+    sun_rot += (Math.PI / 4) * deltaTime; // 1초당 45도 자전
+    earth_rot += Math.PI * deltaTime; // 1초당 180도 자전
+    moon_rot += Math.PI * deltaTime; // 1초당 180도 자전
+
+    earth_rev += (Math.PI / 6) * deltaTime; // 1초당 30도 공전
+    moon_rev += Math.PI * 2 * deltaTime; // 1초당 360도 공전
     applyTransform(currentTransformType);
   }
   render();
@@ -262,15 +229,6 @@ async function main() {
 
     setupBuffers();
     axes = new Axes(gl, 0.8);
-
-    textOverlay = setupText(canvas, "NO TRANSFORMATION", 1);
-    setupText(
-      canvas,
-      "press 1~7 to apply different order of transformations",
-      2
-    );
-
-    setupKeyboardEvents();
 
     return true;
   } catch (error) {
