@@ -88,9 +88,6 @@ function render() {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.enable(gl.DEPTH_TEST);
 
-  // Model transformation matrix
-  mat4.rotateX(modelMatrix, modelMatrix, glMatrix.toRadian(deltaTime * 50));
-
   // Viewing transformation matrix
   let camX =
     cameraCircleRadius *
