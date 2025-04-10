@@ -29,8 +29,8 @@ let isInitialized = false;
 let viewMatrix = mat4.create();
 let projMatrix = mat4.create();
 let modelMatrix = mat4.create();
-const cameraCircleRadius = 5.0;
-const cameraCircleHeight = 2.0;
+const cameraCircleRadius = 3.0;
+const cameraCircleHeight = 10.0;
 const cameraCircleSpeed = 90.0;
 const square_pyramid = new squarePyramid(gl);
 const axes = new Axes(gl, 1.8);
@@ -94,10 +94,11 @@ function render() {
     Math.sin(glMatrix.toRadian(cameraCircleSpeed * elapsedTime));
   let camZ =
     cameraCircleRadius *
-    Math.cos(glMatrix.toRadian(cameraCircleSpeed * elapsedTime));
+    Math.cos(glMatrix.toRadian(cameraCircleSpeed * elapsedTime))
+  let camY = cameraCircleHeight * 0.5 * (Math.sin(glMatrix.toRadian(cameraCircleSpeed * 0.5 * elapsedTime)) + 1);
   mat4.lookAt(
     viewMatrix,
-    vec3.fromValues(camX, cameraCircleHeight, camZ), // camera position
+    vec3.fromValues(camX, camY, camZ), // camera position
     vec3.fromValues(0, 0, 0), // look at origin
     vec3.fromValues(0, 1, 0)
   ); // up vector
