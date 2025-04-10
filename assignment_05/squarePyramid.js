@@ -80,9 +80,9 @@ export class squarePyramid {
             // back face   (v0,v3,v4)
             0.0,  1.0,  0.0,  0.5,  0.0, -0.5, -0.5,  0.0, -0.5,
             // left face   (v0,v4,v1)
-            0.5, -0.5, -0.5, -0.5,  0.0, -0.5, -0.5,  0.0,  0.5,
+            0.0,  1.0,  0.0, -0.5,  0.0, -0.5, -0.5,  0.0,  0.5,
             // bottom face (v1, v2, v3, v4)
-            // -0.5,  0.0,  0.5,  0.5,  0.0,  0.5,  0.5,  0.0, -0.5,  -0.5,  0.0, -0.5,
+           -0.5,  0.0,  0.5,  0.5,  0.0,  0.5,  0.5,  0.0, -0.5,  -0.5,  0.0, -0.5,
         ]);
 
         // this.normals = new Float32Array([
@@ -121,8 +121,7 @@ export class squarePyramid {
                 0, 1, 1, 1,   0, 1, 1, 1,   0, 1, 1, 1, 
                 // bottom face (v7,v4,v3,v2) - blue
                 0, 0, 1, 1,   0, 0, 1, 1,   0, 0, 1, 1, 
-                // back face (v4,v7,v6,v5) - magenta
-                1, 0, 1, 1,   1, 0, 1, 1,   1, 0, 1, 1, 
+                0, 0, 1, 1,   0, 0, 1, 1,   0, 0, 1, 1, 
             ]);
         }
 
@@ -146,6 +145,8 @@ export class squarePyramid {
             3, 4, 5,
             6, 7, 8,
             9, 10, 11,
+            12, 13, 14,
+            14, 15, 12
         ]);
 
         // this.sameVertices = new Uint16Array([
@@ -214,9 +215,9 @@ export class squarePyramid {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.bufferData(gl.ARRAY_BUFFER, totalSize, gl.STATIC_DRAW);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertices);
-        gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
+       // gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize, this.colors);
-        gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize + cSize, this.texCoords);
+       // gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize + cSize, this.texCoords);
 
         // EBO에 인덱스 데이터 복사
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ebo);
@@ -224,15 +225,15 @@ export class squarePyramid {
 
         // vertex attributes 설정
         gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);  // position
-        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, vSize);  // normal
+        //gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, vSize);  // normal
         gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, vSize + nSize);  // color
-        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, vSize + nSize + cSize);  // texCoord
+       // gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, vSize + nSize + cSize);  // texCoord
 
         // vertex attributes 활성화
         gl.enableVertexAttribArray(0);
-        gl.enableVertexAttribArray(1);
+       // gl.enableVertexAttribArray(1);
         gl.enableVertexAttribArray(2);
-        gl.enableVertexAttribArray(3);
+       // gl.enableVertexAttribArray(3);
 
         // 버퍼 바인딩 해제
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
@@ -247,18 +248,17 @@ export class squarePyramid {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         
         // normals 데이터만 업데이트
-        gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
+        // gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
         
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.bindVertexArray(null);
     }
 
     draw(shader) {
-
         const gl = this.gl;
         shader.use();
         gl.bindVertexArray(this.vao);
-        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, 18, gl.UNSIGNED_SHORT, 0);
         gl.bindVertexArray(null);
     }
 

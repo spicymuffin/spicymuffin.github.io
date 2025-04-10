@@ -1,8 +1,8 @@
 /*-------------------------------------------------------------------------
 10_CameraCircle.js
 
-- Viewing a 3D unit cube at origin with perspective projection
-- The cube is rotating about the x-axis with given constant speed
+- Viewing a 3D unit squarePyramid at origin with perspective projection
+- The squarePyramid is rotating about the x-axis with given constant speed
 - A camera is rotating around the origin through the circle of radius 5
 - The height (y position) of the camera is +2.
 - The camera is always looking at the origin.
@@ -15,7 +15,7 @@ import {
   Axes,
 } from "../../util/util.js";
 import { Shader, readShaderFile } from "../../util/shader.js";
-import { Cube } from "../../util/cube.js";
+import { squarePyramid } from "../squarePyramid.js";
 // import { Pyramid } from "squarePyramid.js";
 
 const canvas = document.getElementById("glCanvas");
@@ -32,7 +32,7 @@ let modelMatrix = mat4.create();
 const cameraCircleRadius = 5.0;
 const cameraCircleHeight = 2.0;
 const cameraCircleSpeed = 90.0;
-const cube = new Cube(gl);
+const square_pyramid = new squarePyramid(gl);
 const axes = new Axes(gl, 1.8);
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -105,12 +105,12 @@ function render() {
     vec3.fromValues(0, 1, 0)
   ); // up vector
 
-  // drawing the cube
-  shader.use(); // using the cube's shader
+  // drawing the squarePyramid
+  shader.use(); // using the squarePyramid's shader
   shader.setMat4("u_model", modelMatrix);
   shader.setMat4("u_view", viewMatrix);
   shader.setMat4("u_projection", projMatrix);
-  cube.draw(shader);
+  square_pyramid.draw(shader);
 
   // drawing the axes (using the axes's shader)
   axes.draw(viewMatrix, projMatrix);
