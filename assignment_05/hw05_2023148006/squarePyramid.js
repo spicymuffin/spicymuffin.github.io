@@ -116,7 +116,7 @@ export class squarePyramid {
                 // right face (v0,v3,v4,v5) - yellow
                 1, 1, 0, 1,   1, 1, 0, 1,   1, 1, 0, 1, 
                 // top face (v0,v5,v6,v1) - green
-                0, 1, 0, 1,   0, 1, 0, 1,   0, 1, 0, 1, 
+                1, 0, 1, 1,   1, 0, 1, 1,   1, 0, 1, 1, 
                 // left face (v1,v6,v7,v2) - cyan
                 0, 1, 1, 1,   0, 1, 1, 1,   0, 1, 1, 1, 
                 // bottom face (v7,v4,v3,v2) - blue

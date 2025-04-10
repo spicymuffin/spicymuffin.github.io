@@ -15,7 +15,7 @@ import {
   Axes,
 } from "../../util/util.js";
 import { Shader, readShaderFile } from "../../util/shader.js";
-import { squarePyramid } from "../squarePyramid.js";
+import { squarePyramid } from "./squarePyramid.js";
 // import { Pyramid } from "squarePyramid.js";
 
 const canvas = document.getElementById("glCanvas");
