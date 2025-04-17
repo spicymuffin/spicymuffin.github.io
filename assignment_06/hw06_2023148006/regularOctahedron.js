@@ -139,18 +139,19 @@ export class regularOctahedron {
 
         this.texCoords = new Float32Array([
             // front face (v0,v1,v2,v3)
-            1, 1, 0, 1, 0, 0, 1, 0,
+            0.5, 1.0, 0.0, 0.5, 0.25, 0.5,
             // right face (v0,v3,v4,v5)
-            0, 1, 0, 0, 1, 0, 1, 1,
-            // back face   (v0,v3,v4)
+            0.5, 1.0, 0.25, 0.5, 0.5, 0.5, 
+           
+            0.5, 1.0, 0.5, 0.5, 0.75, 0.5,
+            
+            0.5, 1.0, 0.75, 0.5, 1.0, 0.5,
 
-            1, 0, 1, 1, 0, 1, 0, 0,
-            // left face (v1,v6,v7,v2)
-            1, 1, 0, 1, 0, 0, 1, 0,
-            // bottom face (v7,v4,v3,v2)
-            1, 1, 0, 1, 0, 0, 1, 0,
-            // back face (v4,v7,v6,v5)
-            0, 0, 1, 0, 1, 1, 0, 1
+            0.5, 0.0, 0.25, 0.5, 0.0, 0.5,
+            0.5, 0.0, 0.5, 0.5, 0.25, 0.5,
+            0.5, 0.0, 0.75, 0.5, 0.5, 0.5,
+            0.5, 0.0, 0.1, 0.5, 0.75, 0.5,           
+
         ]);
 
         this.indices = new Uint16Array([
@@ -221,7 +222,7 @@ export class regularOctahedron {
         const vSize = this.vertices.byteLength;
         const nSize = 0 // this.normals.byteLength;
         const cSize = this.colors.byteLength;
-        const tSize = 0// this.texCoords.byteLength;
+        const tSize = this.texCoords.byteLength;
         const totalSize = vSize + nSize + cSize + tSize;
 
         gl.bindVertexArray(this.vao);
@@ -242,13 +243,13 @@ export class regularOctahedron {
         gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);  // position
         //gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, vSize);  // normal
         gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, vSize + nSize);  // color
-        // gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, vSize + nSize + cSize);  // texCoord
+        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, vSize + nSize + cSize);  // texCoord
 
         // vertex attributes 활성화
         gl.enableVertexAttribArray(0);
         // gl.enableVertexAttribArray(1);
         gl.enableVertexAttribArray(2);
-        // gl.enableVertexAttribArray(3);
+        gl.enableVertexAttribArray(3);
 
         // 버퍼 바인딩 해제
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
