@@ -74,6 +74,7 @@ export class regularOctahedron {
 
         // Initializing data
         this.vertices = new Float32Array([
+            // top part
             // front face  (v0,v1,v2)
             0.0, 0.7071, 0.0, -0.5, 0.0, 0.5, 0.5, 0.0, 0.5,
             // right face  (v0,v2,v3)
@@ -82,18 +83,16 @@ export class regularOctahedron {
             0.0, 0.7071, 0.0, 0.5, 0.0, -0.5, -0.5, 0.0, -0.5,
             // left face   (v0,v4,v1)
             0.0, 0.7071, 0.0, -0.5, 0.0, -0.5, -0.5, 0.0, 0.5,
-            // bottom face (v1, v2, v3, v4)
-            //-0.5, 0.0, 0.5, 0.5, 0.0, 0.5, 0.5, 0.0, -0.5, -0.5, 0.0, -0.5,
 
             // bottom part
-            // front face  (v5,v1,v2)
-            0.0, -0.7071, 0.0, -0.5, 0.0, 0.5, 0.5, 0.0, 0.5,
-            // right face  (v5,v2,v3)
-            0.0, -0.7071, 0.0, 0.5, 0.0, 0.5, 0.5, 0.0, -0.5,
-            // back face   (v5,v3,v4)
-            0.0, -0.7071, 0.0, 0.5, 0.0, -0.5, -0.5, 0.0, -0.5,
-            // left face   (v5,v4,v1)
-            0.0, -0.7071, 0.0, -0.5, 0.0, -0.5, -0.5, 0.0, 0.5,
+            // front (v5, v2, v1)
+            0.0, -0.7071, 0.0, 0.5, 0.0, 0.5, -0.5, 0.0, 0.5,
+            // right (v5, v3, v2)
+            0.0, -0.7071, 0.0, 0.5, 0.0, -0.5, 0.5, 0.0, 0.5,
+            // back (v5, v4, v3)
+            0.0, -0.7071, 0.0, -0.5, 0.0, -0.5, 0.5, 0.0, -0.5,
+            // left (v5, v1, v4)
+            0.0, -0.7071, 0.0, -0.5, 0.0, 0.5, -0.5, 0.0, -0.5,
         ]);
 
         // this.normals = new Float32Array([
@@ -122,9 +121,9 @@ export class regularOctahedron {
         }
         else {
             this.colors = new Float32Array([
-                // front face (v0,v1,v2,v3) - red
+                // front face (v0,v1,v2) - red
                 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1,
-                // right face (v0,v3,v4,v5) - yellow
+                // right face (v0,v2,v3) - yellow
                 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1,
                 // top face (v0,v5,v6,v1) - green
                 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1,
@@ -138,20 +137,21 @@ export class regularOctahedron {
             ]);
         }
 
-        // this.texCoords = new Float32Array([
-        //     // front face (v0,v1,v2,v3)
-        //     1, 1,   0, 1,   0, 0,   1, 0,
-        //     // right face (v0,v3,v4,v5)
-        //     0, 1,   0, 0,   1, 0,   1, 1,
-        //     // top face (v0,v5,v6,v1)
-        //     1, 0,   1, 1,   0, 1,   0, 0,
-        //     // left face (v1,v6,v7,v2)
-        //     1, 1,   0, 1,   0, 0,   1, 0,
-        //     // bottom face (v7,v4,v3,v2)
-        //     1, 1,   0, 1,   0, 0,   1, 0,
-        //     // back face (v4,v7,v6,v5)
-        //     0, 0,   1, 0,   1, 1,   0, 1
-        // ]);
+        this.texCoords = new Float32Array([
+            // front face (v0,v1,v2,v3)
+            1, 1, 0, 1, 0, 0, 1, 0,
+            // right face (v0,v3,v4,v5)
+            0, 1, 0, 0, 1, 0, 1, 1,
+            // back face   (v0,v3,v4)
+
+            1, 0, 1, 1, 0, 1, 0, 0,
+            // left face (v1,v6,v7,v2)
+            1, 1, 0, 1, 0, 0, 1, 0,
+            // bottom face (v7,v4,v3,v2)
+            1, 1, 0, 1, 0, 0, 1, 0,
+            // back face (v4,v7,v6,v5)
+            0, 0, 1, 0, 1, 1, 0, 1
+        ]);
 
         this.indices = new Uint16Array([
             0, 1, 2,
@@ -232,7 +232,7 @@ export class regularOctahedron {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertices);
         // gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize, this.colors);
-        // gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize + cSize, this.texCoords);
+        gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize + cSize, this.texCoords);
 
         // EBO에 인덱스 데이터 복사
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ebo);

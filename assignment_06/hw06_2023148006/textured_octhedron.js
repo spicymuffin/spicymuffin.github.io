@@ -1,8 +1,8 @@
-import { resizeAspectRatio, Axes } from '../util/util.js';
-import { Shader, readShaderFile } from '../util/shader.js';
-import { Cube } from '../util/cube.js';
-import { Arcball } from '../util/arcball.js';
-import { loadTexture } from '../util/texture.js';
+import { resizeAspectRatio, Axes } from '../../util/util.js';
+import { Shader, readShaderFile } from '../../util/shader.js';
+import { regularOctahedron } from './regularOctahedron.js';
+import { Arcball } from '../../util/arcball.js';
+import { loadTexture } from '../../util/texture.js';
 const canvas = document.getElementById('glCanvas');
 const gl = canvas.getContext('webgl2');
 let shader;
@@ -11,8 +11,8 @@ let viewMatrix = mat4.create();
 let projMatrix = mat4.create();
 let modelMatrix = mat4.create();
 const axes = new Axes(gl, 1.5); // create an Axes object with the length of axis 1.5
-const texture = loadTexture(gl, true, '../images/textures/woodWall3.png'); // see ../util/texture.js
-const cube = new Cube(gl);
+const texture = loadTexture(gl, true, '../../images/textures/sunrise.jpg'); // see ../util/texture.js
+const cube = new regularOctahedron(gl);
 
 // Arcball object
 const arcball = new Arcball(canvas, 5.0, { rotation: 2.0, zoom: 0.0005 });
@@ -45,7 +45,7 @@ function initWebGL() {
     resizeAspectRatio(gl, canvas);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.1, 0.2, 0.3, 1.0);
-    
+
     return true;
 }
 
@@ -83,7 +83,7 @@ async function main() {
         if (!initWebGL()) {
             throw new Error('WebGL 초기화 실패');
         }
-        
+
         await initShader();
 
         // View transformation matrix (the whole world is translated to -3 in z-direction)
