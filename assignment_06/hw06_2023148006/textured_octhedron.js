@@ -13,7 +13,7 @@ let viewMatrix = mat4.create();
 let projMatrix = mat4.create();
 let modelMatrix = mat4.create();
 
-const cube = new Cube(gl);
+const cube = new regularOctahedron(gl);
 const axes = new Axes(gl, 2.2); // create an Axes object with the length of axis 1.5
 
 // Arcball object: initial distance 5.0, rotation sensitivity 2.0, zoom sensitivity 0.0005
