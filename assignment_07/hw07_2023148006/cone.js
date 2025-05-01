@@ -63,100 +63,116 @@ class Cube
 8) Fragment shader: should catch the vertex color from the vertex shader
 -----------------------------------------------------------------------------*/
 
-export class Cube {
-    constructor(gl, options = {}) {
+import { vectadd, vectsub, normalize, cross, find_normal } from './vectorutil.js';
+
+export class Cone {
+    constructor(gl, options = { "nvertices": 32, "radius": 0.5 }) {
         this.gl = gl;
-        
+
         // Creating VAO and buffers
         this.vao = gl.createVertexArray();
         this.vbo = gl.createBuffer();
         this.ebo = gl.createBuffer();
 
+        this.nvertices = options["nvertices"];
+        this.radius = options["radius"];
+
+        vertbuf = [];
+
+        // Compute and push the cone base coords
+        for (let i = 0; i < this.nvertices; i++) {
+            let theta = (i / this.nvertices) * Math.PI * 2.0;
+            let x = this.radius * Math.cos(theta);
+            let y = this.radius * Math.sin(theta);
+            let z = -0.5;
+            vertbuf.push(x, y, z);
+        }
+
+        // Push the cone tip coords
+        vertbuf.push(0.0, 0.0, 0.5); // tip of the cone
+
         // Initializing data
-        this.vertices = new Float32Array([
-            // front face  (v0,v1,v2,v3)
-            0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,  -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,
-            // right face  (v0,v3,v4,v5)
-            0.5,  0.5,  0.5,   0.5, -0.5,  0.5,   0.5, -0.5, -0.5,   0.5,  0.5, -0.5,
-            // top face    (v0,v5,v6,v1)
-            0.5,  0.5,  0.5,   0.5,  0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,
-            // left face   (v1,v6,v7,v2)
-            -0.5,  0.5,  0.5,  -0.5,  0.5, -0.5,  -0.5, -0.5, -0.5,  -0.5, -0.5,  0.5,
-            // bottom face (v7,v4,v3,v2)
-            -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5, -0.5,  0.5,  -0.5, -0.5,  0.5,
-            // back face   (v4,v7,v6,v5)
-            0.5, -0.5, -0.5,  -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,   0.5,  0.5, -0.5
-        ]);
+        this.vertices = new Float32Array(vertbuf);
+
+        // Compute the normals for the faces (nvertex normals)
+        let normalbuf = [];
+        let tip = [vertbuf[this.nvertices * 3], vertbuf[this.nvertices * 3 + 1], vertbuf[this.nvertices * 3 + 2]];
+        for (let i = 0; i < this.nvertices; i++) {
+            let v0 = [vertbuf[i * 3], vertbuf[i * 3 + 1], vertbuf[i * 3 + 2]];
+            let v1 = [0,0,0];
+            if (i == this.nvertices - 1) {
+                v1[0] = vertbuf[0];
+                v1[1] = vertbuf[1];
+                v1[2] = vertbuf[2];
+            }
+            else {
+                v1[0] = vertbuf[(i + 1) * 3];
+                v1[1] = vertbuf[(i + 1) * 3 + 1];
+                v1[2] = vertbuf[(i + 1) * 3 + 2];
+            }
+
+            let n = find_normal(tip, v0, v1);
+            normalbuf.push(n[0], n[1], n[2]);
+        }
 
         this.normals = new Float32Array([
-            // front face (v0,v1,v2,v3)
-            0, 0, 1,   0, 0, 1,   0, 0, 1,   0, 0, 1,
-            // right face (v0,v3,v4,v5)
-            1, 0, 0,   1, 0, 0,   1, 0, 0,   1, 0, 0,
-            // top face (v0,v5,v6,v1)
-            0, 1, 0,   0, 1, 0,   0, 1, 0,   0, 1, 0,
-            // left face (v1,v6,v7,v2)
-            -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  -1, 0, 0,
-            // bottom face (v7,v4,v3,v2)
-            0, -1, 0,   0, -1, 0,   0, -1, 0,   0, -1, 0,
-            // back face (v4,v7,v6,v5)
-            0, 0, -1,   0, 0, -1,   0, 0, -1,   0, 0, -1
+
         ]);
 
         // if color is provided, set all vertices' color to the given color
         if (options.color) {
             for (let i = 0; i < 24 * 4; i += 4) {
                 this.colors[i] = options.color[0];
-                this.colors[i+1] = options.color[1];
-                this.colors[i+2] = options.color[2];
-                this.colors[i+3] = options.color[3];
+                this.colors[i + 1] = options.color[1];
+                this.colors[i + 2] = options.color[2];
+                this.colors[i + 3] = options.color[3];
             }
         }
         else {
             this.colors = new Float32Array([
                 // front face (v0,v1,v2,v3) - red
-                1, 0, 0, 1,   1, 0, 0, 1,   1, 0, 0, 1,   1, 0, 0, 1,
+                1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1,
                 // right face (v0,v3,v4,v5) - yellow
-                1, 1, 0, 1,   1, 1, 0, 1,   1, 1, 0, 1,   1, 1, 0, 1,
+                1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1,
                 // top face (v0,v5,v6,v1) - green
-                0, 1, 0, 1,   0, 1, 0, 1,   0, 1, 0, 1,   0, 1, 0, 1,
+                0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
                 // left face (v1,v6,v7,v2) - cyan
-                0, 1, 1, 1,   0, 1, 1, 1,   0, 1, 1, 1,   0, 1, 1, 1,
+                0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1,
                 // bottom face (v7,v4,v3,v2) - blue
-                0, 0, 1, 1,   0, 0, 1, 1,   0, 0, 1, 1,   0, 0, 1, 1,
+                0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
                 // back face (v4,v7,v6,v5) - magenta
-                1, 0, 1, 1,   1, 0, 1, 1,   1, 0, 1, 1,   1, 0, 1, 1
+                1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1
             ]);
         }
 
         this.texCoords = new Float32Array([
             // front face (v0,v1,v2,v3)
-            1, 1,   0, 1,   0, 0,   1, 0,
+            1, 1, 0, 1, 0, 0, 1, 0,
             // right face (v0,v3,v4,v5)
-            0, 1,   0, 0,   1, 0,   1, 1,
+            0, 1, 0, 0, 1, 0, 1, 1,
             // top face (v0,v5,v6,v1)
-            1, 0,   1, 1,   0, 1,   0, 0,
+            1, 0, 1, 1, 0, 1, 0, 0,
             // left face (v1,v6,v7,v2)
-            1, 1,   0, 1,   0, 0,   1, 0,
+            1, 1, 0, 1, 0, 0, 1, 0,
             // bottom face (v7,v4,v3,v2)
-            1, 1,   0, 1,   0, 0,   1, 0,
+            1, 1, 0, 1, 0, 0, 1, 0,
             // back face (v4,v7,v6,v5)
-            0, 0,   1, 0,   1, 1,   0, 1
+            0, 0, 1, 0, 1, 1, 0, 1
         ]);
 
         this.indices = new Uint16Array([
             // front face
-            0, 1, 2,   2, 3, 0,      // v0-v1-v2, v2-v3-v0
+            0, 1, 2, 2, 3, 0,      // v0-v1-v2, v2-v3-v0
             // right face
-            4, 5, 6,   6, 7, 4,      // v0-v3-v4, v4-v5-v0
+            4, 5, 6, 6, 7, 4,      // v0-v3-v4, v4-v5-v0
             // top face
-            8, 9, 10,  10, 11, 8,    // v0-v5-v6, v6-v1-v0
+            8, 9, 10, 10, 11, 8,    // v0-v5-v6, v6-v1-v0
             // left face
-            12, 13, 14,  14, 15, 12, // v1-v6-v7, v7-v2-v1
+            12, 13, 14, 14, 15, 12, // v1-v6-v7, v7-v2-v1
             // bottom face
-            16, 17, 18,  18, 19, 16, // v7-v4-v3, v3-v2-v7
+            16, 17, 18, 18, 19, 16, // v7-v4-v3, v3-v2-v7
             // back face
-            20, 21, 22,  22, 23, 20  // v4-v7-v6, v6-v5-v4
+            20, 21, 22, 22, 23, 20  // v4-v7-v6, v6-v5-v4
         ]);
 
         this.sameVertices = new Uint16Array([
@@ -177,25 +193,25 @@ export class Cube {
         // compute vertex normals 
         for (let i = 0; i < 24; i += 3) {
 
-            let vn_x = (this.normals[this.sameVertices[i]*3] + 
-                       this.normals[this.sameVertices[i+1]*3] + 
-                       this.normals[this.sameVertices[i+2]*3]) / 3; 
-            let vn_y = (this.normals[this.sameVertices[i]*3 + 1] + 
-                       this.normals[this.sameVertices[i+1]*3 + 1] + 
-                       this.normals[this.sameVertices[i+2]*3 + 1]) / 3; 
-            let vn_z = (this.normals[this.sameVertices[i]*3 + 2] + 
-                       this.normals[this.sameVertices[i+1]*3 + 2] + 
-                       this.normals[this.sameVertices[i+2]*3 + 2]) / 3; 
+            let vn_x = (this.normals[this.sameVertices[i] * 3] +
+                this.normals[this.sameVertices[i + 1] * 3] +
+                this.normals[this.sameVertices[i + 2] * 3]) / 3;
+            let vn_y = (this.normals[this.sameVertices[i] * 3 + 1] +
+                this.normals[this.sameVertices[i + 1] * 3 + 1] +
+                this.normals[this.sameVertices[i + 2] * 3 + 1]) / 3;
+            let vn_z = (this.normals[this.sameVertices[i] * 3 + 2] +
+                this.normals[this.sameVertices[i + 1] * 3 + 2] +
+                this.normals[this.sameVertices[i + 2] * 3 + 2]) / 3;
 
-            this.vertexNormals[this.sameVertices[i]*3] = vn_x;
-            this.vertexNormals[this.sameVertices[i+1]*3] = vn_x;
-            this.vertexNormals[this.sameVertices[i+2]*3] = vn_x;
-            this.vertexNormals[this.sameVertices[i]*3 + 1] = vn_y;
-            this.vertexNormals[this.sameVertices[i+1]*3 + 1] = vn_y;
-            this.vertexNormals[this.sameVertices[i+2]*3 + 1] = vn_y;
-            this.vertexNormals[this.sameVertices[i]*3 + 2] = vn_z;
-            this.vertexNormals[this.sameVertices[i+1]*3 + 2] = vn_z;
-            this.vertexNormals[this.sameVertices[i+2]*3 + 2] = vn_z;
+            this.vertexNormals[this.sameVertices[i] * 3] = vn_x;
+            this.vertexNormals[this.sameVertices[i + 1] * 3] = vn_x;
+            this.vertexNormals[this.sameVertices[i + 2] * 3] = vn_x;
+            this.vertexNormals[this.sameVertices[i] * 3 + 1] = vn_y;
+            this.vertexNormals[this.sameVertices[i + 1] * 3 + 1] = vn_y;
+            this.vertexNormals[this.sameVertices[i + 2] * 3 + 1] = vn_y;
+            this.vertexNormals[this.sameVertices[i] * 3 + 2] = vn_z;
+            this.vertexNormals[this.sameVertices[i + 1] * 3 + 2] = vn_z;
+            this.vertexNormals[this.sameVertices[i + 2] * 3 + 2] = vn_z;
         }
 
         this.initBuffers();
@@ -256,10 +272,10 @@ export class Cube {
 
         gl.bindVertexArray(this.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        
+
         // normals 데이터만 업데이트
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
-        
+
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.bindVertexArray(null);
     }
