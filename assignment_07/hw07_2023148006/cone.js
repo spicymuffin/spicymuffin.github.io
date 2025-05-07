@@ -1,301 +1,234 @@
-/*-----------------------------------------------------------------------------
-class Cube
-
-1) Vertex positions
-    A cube has 6 faces and each face has 4 vertices
-    The total number of vertices is 24 (6 faces * 4 verts)
-    So, vertices need 72 floats (24 * 3 (x, y, z)) in the vertices array
-
-2) Vertex indices
-    Vertex indices of the unit cube is as follows:
-     v6----- v5
-     /|      /|
-    v1------v0|
-    | |     | |
-    | v7----|-v4
-    |/      |/
-    v2------v3
-
-    The order of faces and their vertex indices is as follows:
-        front (0,1,2,3), right (0,3,4,5), top (0,5,6,1), 
-        left (1,6,7,2), bottom (7,4,3,2), back (4,7,6,5)
-    Note that each face has two triangles, 
-    so the total number of triangles is 12 (6 faces * 2 triangles)
-    And, we need to maintain the order of vertices for each triangle as 
-    counterclockwise (when we see the face from the outside of the cube):
-        front [(0,1,2), (2,3,0)]
-        right [(0,3,4), (4,5,0)]
-        top [(0,5,6), (6,1,0)]
-        left [(1,6,7), (7,2,1)]
-        bottom [(7,4,3), (3,2,7)]
-        back [(4,7,6), (6,5,4)]
-
-3) Vertex normals
-    Each vertex in the same face has the same normal vector (flat shading)
-    The normal vector is the same as the face normal vector
-    front face: (0,0,1), right face: (1,0,0), top face: (0,1,0), 
-    left face: (-1,0,0), bottom face: (0,-1,0), back face: (0,0,-1) 
-
-4) Vertex colors
-    Each vertex in the same face has the same color (flat shading)
-    The color is the same as the face color
-    front face: red (1,0,0,1), right face: yellow (1,1,0,1), top face: green (0,1,0,1), 
-    left face: cyan (0,1,1,1), bottom face: blue (0,0,1,1), back face: magenta (1,0,1,1) 
-
-5) Vertex texture coordinates
-    Each vertex in the same face has the same texture coordinates (flat shading)
-    The texture coordinates are the same as the face texture coordinates
-    front face: v0(1,1), v1(0,1), v2(0,0), v3(1,0)
-    right face: v0(0,1), v3(0,0), v4(1,0), v5(1,1)
-    top face: v0(1,0), v5(0,0), v6(0,1), v1(1,1)
-    left face: v1(1,0), v6(0,0), v7(0,1), v2(1,1)
-    bottom face: v7(0,0), v4(0,1), v3(1,1), v2(1,0)
-    back face: v4(0,0), v7(0,1), v6(1,1), v5(1,0)
-
-6) Parameters:
-    1] gl: WebGLRenderingContext
-    2] options:
-        1> color: array of 4 floats (default: [0.8, 0.8, 0.8, 1.0 ])
-           in this case, all vertices have the same given color
-
-7) Vertex shader: the location (0: position attrib (vec3), 1: normal attrib (vec3),
-                            2: color attrib (vec4), and 3: texture coordinate attrib (vec2))
-8) Fragment shader: should catch the vertex color from the vertex shader
------------------------------------------------------------------------------*/
-
-import { vectadd, vectsub, normalize, cross, find_normal } from './vectorutil.js';
+import { find_normal } from './vectorutil.js';
 
 export class Cone {
-    constructor(gl, options = { "nvertices": 32, "radius": 0.5 }) {
+    /**
+     * @param {WebGLRenderingContext} gl         - WebGL 렌더링 컨텍스트
+     * @param {number} segments                 - 옆면 세그먼트 수 (원 둘레를 몇 등분할지)
+     * @param {object} options
+     *        options.color : [r, g, b, a] 형태의 색상 (기본 [0.8, 0.8, 0.8, 1.0])
+     */
+    constructor(gl, segments = 32, options = {}) {
         this.gl = gl;
 
-        // Creating VAO and buffers
+        // VAO, VBO, EBO 생성
         this.vao = gl.createVertexArray();
         this.vbo = gl.createBuffer();
         this.ebo = gl.createBuffer();
 
-        this.nvertices = options["nvertices"];
-        this.radius = options["radius"];
+        // 파라미터 설정
+        const radius = 0.5;     // 원기둥 반지름
+        const halfH = 0.5;      // 높이의 절반 (y=-0.5 ~ y=0.5)
+        this.segments = segments;
 
-        vertbuf = [];
+        // 세그먼트별 각도 간격
+        const angleStep = (2 * Math.PI) / segments;
 
-        // Compute and push the cone base coords
-        for (let i = 0; i < this.nvertices; i++) {
-            let theta = (i / this.nvertices) * Math.PI * 2.0;
-            let x = this.radius * Math.cos(theta);
-            let y = this.radius * Math.sin(theta);
-            let z = -0.5;
-            vertbuf.push(x, y, z);
-        }
+        // 정점/법선/색상/텍스처좌표/인덱스 데이터를 담을 임시 배열
+        const positions = [];
+        const normals = [];
+        const colors = [];
+        const texCoords = [];
+        const indices = [];
 
-        // Push the cone tip coords
-        vertbuf.push(0.0, 0.0, 0.5); // tip of the cone
-
-        // Initializing data
-        this.vertices = new Float32Array(vertbuf);
-
-        // Compute the normals for the faces (nvertex normals)
-        let normalbuf = [];
-        let tip = [vertbuf[this.nvertices * 3], vertbuf[this.nvertices * 3 + 1], vertbuf[this.nvertices * 3 + 2]];
-        for (let i = 0; i < this.nvertices; i++) {
-            let v0 = [vertbuf[i * 3], vertbuf[i * 3 + 1], vertbuf[i * 3 + 2]];
-            let v1 = [0,0,0];
-            if (i == this.nvertices - 1) {
-                v1[0] = vertbuf[0];
-                v1[1] = vertbuf[1];
-                v1[2] = vertbuf[2];
-            }
-            else {
-                v1[0] = vertbuf[(i + 1) * 3];
-                v1[1] = vertbuf[(i + 1) * 3 + 1];
-                v1[2] = vertbuf[(i + 1) * 3 + 2];
-            }
-
-            let n = find_normal(tip, v0, v1);
-            normalbuf.push(n[0], n[1], n[2]);
-            normalbuf.push(n[0], n[1], n[2]);
-            normalbuf.push(n[0], n[1], n[2]);
-        }
-
-        this.normals = new Float32Array(normalbuf);
-        
-
-        // if color is provided, set all vertices' color to the given color
+        // 옵션에서 color가 있으면 사용, 없으면 기본값 사용
         const defaultColor = [0.8, 0.8, 0.8, 1.0];
         const colorOption = options.color || defaultColor;
-        if (options.color) {
-            for (let i = 0; i < 24 * 4; i += 4) {
-                this.colors[i] = options.color[0];
-                this.colors[i + 1] = options.color[1];
-                this.colors[i + 2] = options.color[2];
-                this.colors[i + 3] = options.color[3];
+
+        // 이 순서가 외부에서 볼 때 CCW가 되도록 정렬한다
+        for (let i = 0; i < segments; i++) {
+            const angle0 = i * angleStep;
+            const angle1 = (i + 1) * angleStep;
+
+            // 현재 세그먼트의 상단 (y=+0.5)
+            const x0 = radius * Math.cos(angle0);
+            const z0 = -radius * Math.sin(angle0);
+            const x1 = radius * Math.cos(angle1);
+            const z1 = -radius * Math.sin(angle1);
+
+            positions.push(
+                // 위
+                0, halfH, 0,
+                // 밑변 1
+                x0, -halfH, z0,
+                // 밑변 2
+                x1, -halfH, z1,
+            );
+
+            let tip = [0, halfH, 0];
+            let v0 = [x0, -halfH, z0];
+            let v1 = [x1, -halfH, z1];
+
+            let n = find_normal(tip, v0, v1);
+
+            // push vertex normals for all 3 vertices on this face
+            for (let f = 0; f < 3; f++) {
+                normals.push(n[0], n[1], n[2]);
             }
-        }
-        else {
-            this.colors = new Float32Array([
-                // front face (v0,v1,v2,v3) - red
-                1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1,
-                // right face (v0,v3,v4,v5) - yellow
-                1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1,
-                // top face (v0,v5,v6,v1) - green
-                0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
-                // left face (v1,v6,v7,v2) - cyan
-                0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1,
-                // bottom face (v7,v4,v3,v2) - blue
-                0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
-                // back face (v4,v7,v6,v5) - magenta
-                1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1
-            ]);
-        }
 
-        this.texCoords = new Float32Array([
-            // front face (v0,v1,v2,v3)
-            1, 1, 0, 1, 0, 0, 1, 0,
-            // right face (v0,v3,v4,v5)
-            0, 1, 0, 0, 1, 0, 1, 1,
-            // top face (v0,v5,v6,v1)
-            1, 0, 1, 1, 0, 1, 0, 0,
-            // left face (v1,v6,v7,v2)
-            1, 1, 0, 1, 0, 0, 1, 0,
-            // bottom face (v7,v4,v3,v2)
-            1, 1, 0, 1, 0, 0, 1, 0,
-            // back face (v4,v7,v6,v5)
-            0, 0, 1, 0, 1, 1, 0, 1
-        ]);
+            // 색상도 마찬가지로 4정점 동일
+            for (let k = 0; k < 3; k++) {
+                colors.push(
+                    colorOption[0],
+                    colorOption[1],
+                    colorOption[2],
+                    colorOption[3]
+                );
+            }
 
-        this.indices = new Uint16Array([
-            // front face
-            0, 1, 2, 2, 3, 0,      // v0-v1-v2, v2-v3-v0
-            // right face
-            4, 5, 6, 6, 7, 4,      // v0-v3-v4, v4-v5-v0
-            // top face
-            8, 9, 10, 10, 11, 8,    // v0-v5-v6, v6-v1-v0
-            // left face
-            12, 13, 14, 14, 15, 12, // v1-v6-v7, v7-v2-v1
-            // bottom face
-            16, 17, 18, 18, 19, 16, // v7-v4-v3, v3-v2-v7
-            // back face
-            20, 21, 22, 22, 23, 20  // v4-v7-v6, v6-v5-v4
-        ]);
+            // 텍스처 좌표 (단순 cylindrical mapping)
+            // u: [0..1], v: y=+0.5 -> 1, y=-0.5 -> 0
+            // const u0 = i / segments;       // angle0 비율
+            // const u1 = (i + 1) / segments; // angle1 비율
+            // texCoords.push(
+            //     // top0
+            //     u0, 1,
+            //     // top1
+            //     u1, 1,
+            //     // bot1
+            //     u1, 0,
+            //     // bot0
+            //     u0, 0
+            // );
 
-        this.sameVertices = new Uint16Array([
-            0, 4, 8,    // indices of the same vertices as v0
-            1, 11, 12,  // indices of the same vertices as v1
-            2, 15, 19,  // indices of the same vertices as v2
-            3, 5, 18,   // indices of the same vertices as v3
-            6, 17, 20,  // indices of the same vertices as v4
-            7, 9, 23,   // indices of the same vertices as v5
-            10, 13, 22, // indices of the same vertices as v6
-            14, 16, 21  // indices of the same vertices as v7
-        ]);
-
-        this.vertexNormals = new Float32Array(72);
-        this.faceNormals = new Float32Array(72);
-        this.faceNormals.set(this.normals);
-
-        // compute vertex normals 
-        for (let i = 0; i < 24; i += 3) {
-
-            let vn_x = (this.normals[this.sameVertices[i] * 3] +
-                this.normals[this.sameVertices[i + 1] * 3] +
-                this.normals[this.sameVertices[i + 2] * 3]) / 3;
-            let vn_y = (this.normals[this.sameVertices[i] * 3 + 1] +
-                this.normals[this.sameVertices[i + 1] * 3 + 1] +
-                this.normals[this.sameVertices[i + 2] * 3 + 1]) / 3;
-            let vn_z = (this.normals[this.sameVertices[i] * 3 + 2] +
-                this.normals[this.sameVertices[i + 1] * 3 + 2] +
-                this.normals[this.sameVertices[i + 2] * 3 + 2]) / 3;
-
-            this.vertexNormals[this.sameVertices[i] * 3] = vn_x;
-            this.vertexNormals[this.sameVertices[i + 1] * 3] = vn_x;
-            this.vertexNormals[this.sameVertices[i + 2] * 3] = vn_x;
-            this.vertexNormals[this.sameVertices[i] * 3 + 1] = vn_y;
-            this.vertexNormals[this.sameVertices[i + 1] * 3 + 1] = vn_y;
-            this.vertexNormals[this.sameVertices[i + 2] * 3 + 1] = vn_y;
-            this.vertexNormals[this.sameVertices[i] * 3 + 2] = vn_z;
-            this.vertexNormals[this.sameVertices[i + 1] * 3 + 2] = vn_z;
-            this.vertexNormals[this.sameVertices[i + 2] * 3 + 2] = vn_z;
+            // 인덱스 (두 삼각형)
+            // 이번 face가 i번째면, 정점 baseIndex = i*4
+            const base = i * 3;
+            indices.push(
+                base, base + 1, base + 2,
+            );
         }
 
+        // Float32Array/Uint16Array에 담기
+        this.vertices = new Float32Array(positions);
+        this.normals = new Float32Array(normals);
+        this.colors = new Float32Array(colors);
+        this.texCoords = new Float32Array(texCoords);
+        this.indices = new Uint16Array(indices);
+
+        // backup normals (for flat/smooth shading)
+        this.faceNormals = new Float32Array(this.normals);
+        this.vertexNormals = new Float32Array(this.normals);
+        this.computeVertexNormals();
+
+        // WebGL 버퍼 초기화
         this.initBuffers();
     }
 
-    copyVertexNormalsToNormals() {
-        this.normals.set(this.vertexNormals);
+    /**
+     * Smooth Shading을 위해,
+     * 각 정점별로 "y축에 수직인 방향 (x, 0, z)을 normalize하여 this.vertexNormals에 저장.
+     */
+    computeVertexNormals() {
+        const vCount = this.vertices.length / 3;
+        // 새로 계산된 스무스 노말을 담을 버퍼 (vertices와 동일 크기)
+        this.vertexNormals = new Float32Array(this.vertices.length);
+
+        for (let i = 0; i < vCount; i++) {
+            const x = this.vertices[i * 3 + 0];
+            const y = this.vertices[i * 3 + 1]; // 여기서는 y는 노말 계산에 사용 X
+            const z = this.vertices[i * 3 + 2];
+
+            // y축에 수직 -> (x, 0, z)를 정규화
+            const len = Math.sqrt(x * x + z * z);
+            // (len == 0)이 되는 경우는 없지만, 혹시 대비
+            if (len > 0) {
+                this.vertexNormals[i * 3 + 0] = x / len;
+                this.vertexNormals[i * 3 + 1] = 0;
+                this.vertexNormals[i * 3 + 2] = z / len;
+            } else {
+                // 혹시 모를 예외 상황(정말로 x=z=0이라면)
+                this.vertexNormals[i * 3 + 0] = 0;
+                this.vertexNormals[i * 3 + 1] = 1; // 그냥 y축 위로
+                this.vertexNormals[i * 3 + 2] = 0;
+            }
+        }
     }
 
+    // faceNormals -> normals 복사
     copyFaceNormalsToNormals() {
         this.normals.set(this.faceNormals);
+    }
+
+    // vertexNormals -> normals 복사
+    copyVertexNormalsToNormals() {
+        this.normals.set(this.vertexNormals);
     }
 
     initBuffers() {
         const gl = this.gl;
 
-        // 버퍼 크기 계산
+        // 배열 크기 측정
         const vSize = this.vertices.byteLength;
         const nSize = this.normals.byteLength;
         const cSize = this.colors.byteLength;
-        const tSize = this.texCoords.byteLength;
+        const tSize = 0 // this.texCoords.byteLength;
         const totalSize = vSize + nSize + cSize + tSize;
 
         gl.bindVertexArray(this.vao);
-
-        // VBO에 데이터 복사
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.bufferData(gl.ARRAY_BUFFER, totalSize, gl.STATIC_DRAW);
+
+        // 순서대로 복사 (positions -> normals -> colors -> texCoords)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertices);
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize, this.colors);
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize + nSize + cSize, this.texCoords);
 
-        // EBO에 인덱스 데이터 복사
+        // 인덱스 버퍼 (EBO)
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ebo);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.indices, gl.STATIC_DRAW);
 
-        // vertex attributes 설정
-        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);  // position
-        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, vSize);  // normal
-        gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, vSize + nSize);  // color
-        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, vSize + nSize + cSize);  // texCoord
+        // vertexAttribPointer 설정
+        // (shader의 layout: 0->pos, 1->normal, 2->color, 3->texCoord)
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);  // positions
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, vSize); // normals
+        gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, vSize + nSize); // colors
+        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, vSize + nSize + cSize); // texCoords
 
-        // vertex attributes 활성화
         gl.enableVertexAttribArray(0);
         gl.enableVertexAttribArray(1);
         gl.enableVertexAttribArray(2);
-        gl.enableVertexAttribArray(3);
+        // gl.enableVertexAttribArray(3);
 
-        // 버퍼 바인딩 해제
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.bindVertexArray(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
+    /**
+     * normals 배열 일부만 업데이트하고 싶을 때 (ex: Face/Vertex normal 토글 후)
+     */
     updateNormals() {
         const gl = this.gl;
-        const vSize = this.vertices.byteLength;
-
         gl.bindVertexArray(this.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
 
-        // normals 데이터만 업데이트
+        const vSize = this.vertices.byteLength;
+        // normals 부분만 다시 업로드
         gl.bufferSubData(gl.ARRAY_BUFFER, vSize, this.normals);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.bindVertexArray(null);
     }
 
+    /**
+     * 그리기
+     * @param {Shader} shader - 사용할 셰이더
+     */
     draw(shader) {
-
         const gl = this.gl;
         shader.use();
         gl.bindVertexArray(this.vao);
-        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, this.indices.length, gl.UNSIGNED_SHORT, 0);
         gl.bindVertexArray(null);
     }
 
+    /**
+     * 리소스 해제
+     */
     delete() {
         const gl = this.gl;
         gl.deleteBuffer(this.vbo);
         gl.deleteBuffer(this.ebo);
         gl.deleteVertexArray(this.vao);
     }
-} 
+}

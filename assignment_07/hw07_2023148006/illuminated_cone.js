@@ -10,11 +10,11 @@
     - 'f' to switch to flat shading
 - Applying Diffuse & Specular reflection using Flat/Smooth shading to the cylinder
 ----------------------------------------------------------------------------------*/
-import { resizeAspectRatio, setupText, updateText} from '../../util/util.js';
+import { resizeAspectRatio, setupText, updateText } from '../../util/util.js';
 import { Shader, readShaderFile } from '../../util/shader.js';
 import { Cube } from '../../util/cube.js';
 import { Arcball } from '../../util/arcball.js';
-import { Cone } from './cylinder_copy.js';
+import { Cone } from './cone.js';
 
 const canvas = document.getElementById('glCanvas');
 const gl = canvas.getContext('webgl2');
@@ -30,7 +30,7 @@ let projMatrix = mat4.create();
 let modelMatrix = mat4.create();
 let lampModelMatrix = mat4.create();
 let arcBallMode = 'CAMERA';     // 'CAMERA' or 'MODEL'
-let shadingMode = 'SMOOTH';       // 'FLAT' or 'SMOOTH'
+let shadingMode = 'SMOOTH';     // 'FLAT' or 'SMOOTH'
 let lightingMode = 'PHONG';     // 'PHONG' or 'GOURAUD'
 
 const cone = new Cone(gl, 32);
@@ -74,7 +74,7 @@ function setupKeyboardEvents() {
         }
         else if (event.key == 'r') {
             arcball.reset();
-            modelMatrix = mat4.create(); 
+            modelMatrix = mat4.create();
             arcBallMode = 'CAMERA';
             updateText(textOverlay2, "arcball mode: " + arcBallMode);
         }
@@ -118,7 +118,7 @@ function initWebGL() {
     resizeAspectRatio(gl, canvas);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
-    
+
     return true;
 }
 
@@ -174,7 +174,7 @@ async function main() {
         if (!initWebGL()) {
             throw new Error('WebGL initialization failed');
         }
-        
+
         // View transformation matrix (camera at cameraPos, invariant in the program)
         mat4.lookAt(
             viewMatrix,
