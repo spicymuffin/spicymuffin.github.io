@@ -113,13 +113,16 @@ export class Cone {
 
             let n = find_normal(tip, v0, v1);
             normalbuf.push(n[0], n[1], n[2]);
+            normalbuf.push(n[0], n[1], n[2]);
+            normalbuf.push(n[0], n[1], n[2]);
         }
 
-        this.normals = new Float32Array([
-
-        ]);
+        this.normals = new Float32Array(normalbuf);
+        
 
         // if color is provided, set all vertices' color to the given color
+        const defaultColor = [0.8, 0.8, 0.8, 1.0];
+        const colorOption = options.color || defaultColor;
         if (options.color) {
             for (let i = 0; i < 24 * 4; i += 4) {
                 this.colors[i] = options.color[0];

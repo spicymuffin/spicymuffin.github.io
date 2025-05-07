@@ -14,11 +14,12 @@ import { resizeAspectRatio, setupText, updateText} from '../../util/util.js';
 import { Shader, readShaderFile } from '../../util/shader.js';
 import { Cube } from '../../util/cube.js';
 import { Arcball } from '../../util/arcball.js';
-import { Cylinder } from '../../util/cylinder.js';
+import { Cone } from './cylinder_copy.js';
 
 const canvas = document.getElementById('glCanvas');
 const gl = canvas.getContext('webgl2');
 let shader;
+let G_shader, P_shader;
 let lampShader;
 let textOverlay2;
 let textOverlay3;
@@ -30,8 +31,9 @@ let modelMatrix = mat4.create();
 let lampModelMatrix = mat4.create();
 let arcBallMode = 'CAMERA';     // 'CAMERA' or 'MODEL'
 let shadingMode = 'SMOOTH';       // 'FLAT' or 'SMOOTH'
+let lightingMode = 'PHONG';     // 'PHONG' or 'GOURAUD'
 
-const cylinder = new Cylinder(gl, 32);
+const cone = new Cone(gl, 32);
 const lamp = new Cube(gl);
 
 const cameraPos = vec3.fromValues(0, 0, 3);
@@ -77,17 +79,29 @@ function setupKeyboardEvents() {
             updateText(textOverlay2, "arcball mode: " + arcBallMode);
         }
         else if (event.key == 's') {
-            cylinder.copyVertexNormalsToNormals();
-            cylinder.updateNormals();
+            cone.copyVertexNormalsToNormals();
+            cone.updateNormals();
             shadingMode = 'SMOOTH';
-            updateText(textOverlay3, "shading mode: " + shadingMode);
+            updateText(textOverlay3, "shading mode: " + shadingMode + " (" + lightingMode + ")");
             render();
         }
         else if (event.key == 'f') {
-            cylinder.copyFaceNormalsToNormals();
-            cylinder.updateNormals();
+            cone.copyFaceNormalsToNormals();
+            cone.updateNormals();
             shadingMode = 'FLAT';
-            updateText(textOverlay3, "shading mode: " + shadingMode);
+            updateText(textOverlay3, "shading mode: " + shadingMode + " (" + lightingMode + ")");
+            render();
+        }
+        else if (event.key == 'g') {
+            shader = G_shader;
+            lightingMode = 'GOURAUD';
+            updateText(textOverlay3, "shading mode: " + shadingMode + " (" + lightingMode + ")");
+            render();
+        }
+        else if (event.key == 'p') {
+            shader = P_shader;
+            lightingMode = 'PHONG';
+            updateText(textOverlay3, "shading mode: " + shadingMode + " (" + lightingMode + ")");
             render();
         }
     });
@@ -111,7 +125,13 @@ function initWebGL() {
 async function initShader() {
     const vertexShaderSource = await readShaderFile('shVert.glsl');
     const fragmentShaderSource = await readShaderFile('shFrag.glsl');
-    shader = new Shader(gl, vertexShaderSource, fragmentShaderSource);
+    P_shader = new Shader(gl, vertexShaderSource, fragmentShaderSource);
+
+    const vertexShaderSource2 = await readShaderFile('gouraudVert.glsl');
+    const fragmentShaderSource2 = await readShaderFile('gouraudFrag.glsl');
+    G_shader = new Shader(gl, vertexShaderSource2, fragmentShaderSource2);
+
+    shader = P_shader;
 }
 
 async function initLampShader() {
@@ -138,7 +158,7 @@ function render() {
     shader.setMat4('u_model', modelMatrix);
     shader.setMat4('u_view', viewMatrix);
     shader.setVec3('u_viewPos', cameraPos);
-    cylinder.draw(shader);
+    cone.draw(shader);
 
     // drawing the lamp
     lampShader.use();
@@ -176,18 +196,32 @@ async function main() {
         await initShader();
         await initLampShader();
 
-        shader.use();
-        shader.setMat4("u_projection", projMatrix);
+        P_shader.use();
+        P_shader.setMat4("u_projection", projMatrix);
 
-        shader.setVec3("material.diffuse", vec3.fromValues(1.0, 0.5, 0.31));
-        shader.setVec3("material.specular", vec3.fromValues(0.5, 0.5, 0.5));
-        shader.setFloat("material.shininess", 16);
+        P_shader.setVec3("material.diffuse", vec3.fromValues(1.0, 0.5, 0.31));
+        P_shader.setVec3("material.specular", vec3.fromValues(0.5, 0.5, 0.5));
+        P_shader.setFloat("material.shininess", 16);
 
-        shader.setVec3("light.position", lightPos);
-        shader.setVec3("light.ambient", vec3.fromValues(0.2, 0.2, 0.2));
-        shader.setVec3("light.diffuse", vec3.fromValues(0.7, 0.7, 0.7));
-        shader.setVec3("light.specular", vec3.fromValues(1.0, 1.0, 1.0));
-        shader.setVec3("u_viewPos", cameraPos);
+        P_shader.setVec3("light.position", lightPos);
+        P_shader.setVec3("light.ambient", vec3.fromValues(0.2, 0.2, 0.2));
+        P_shader.setVec3("light.diffuse", vec3.fromValues(0.7, 0.7, 0.7));
+        P_shader.setVec3("light.specular", vec3.fromValues(1.0, 1.0, 1.0));
+        P_shader.setVec3("u_viewPos", cameraPos);
+
+        G_shader.use();
+        G_shader.setMat4("u_projection", projMatrix);
+
+        G_shader.setVec3("material.diffuse", vec3.fromValues(1.0, 0.5, 0.31));
+        G_shader.setVec3("material.specular", vec3.fromValues(0.5, 0.5, 0.5));
+        G_shader.setFloat("material.shininess", 16);
+
+        G_shader.setVec3("light.position", lightPos);
+        G_shader.setVec3("light.ambient", vec3.fromValues(0.2, 0.2, 0.2));
+        G_shader.setVec3("light.diffuse", vec3.fromValues(0.7, 0.7, 0.7));
+        G_shader.setVec3("light.specular", vec3.fromValues(1.0, 1.0, 1.0));
+        G_shader.setVec3("u_viewPos", cameraPos);
+
 
         lampShader.use();
         lampShader.setMat4("u_projection", projMatrix);
@@ -195,13 +229,15 @@ async function main() {
         mat4.scale(lampModelMatrix, lampModelMatrix, lightSize);
         lampShader.setMat4('u_model', lampModelMatrix);
 
-        setupText(canvas, "Smooth Shading", 1);
+        setupText(canvas, "Cone with Lighting", 1);
         textOverlay2 = setupText(canvas, "arcball mode: " + arcBallMode, 2);
-        textOverlay3 = setupText(canvas, "shading mode: " + shadingMode, 3);
+        textOverlay3 = setupText(canvas, "shading mode: " + shadingMode + " (" + lightingMode + ")", 3);
         setupText(canvas, "press 'a' to change arcball mode", 4);
         setupText(canvas, "press 'r' to reset arcball", 5);
         setupText(canvas, "press 's' to switch to smooth shading", 6);
         setupText(canvas, "press 'f' to switch to flat shading", 7);
+        setupText(canvas, "press 'g' to switch to Gouraud shading", 8);
+        setupText(canvas, "press 'p' to switch to Phong shading", 9);
         setupKeyboardEvents();
 
         // call the render function the first time for animation
