@@ -2,13 +2,24 @@
 
 precision highp float;
 
+uniform int u_quantization_level;
 out vec4 FragColor;
 in vec3 fragPos;
 in vec3 normal;
 in vec2 texCoord;
 
+float quantize(float target)
+{
+    if (target < 0.01) return target;
+
+    float stepsize = 1.0 / float(u_quantization_level);
+
+    target = floor(target / stepsize) * stepsize + stepsize;
+    return target;
+}
+
 struct Material {
-    sampler2D diffuse; // diffuse map
+    vec3 diffuse;      // diffuse color
     vec3 specular;     // 표면의 specular color
     float shininess;   // specular 반짝임 정도
 };
@@ -27,7 +38,7 @@ uniform vec3 u_viewPos;
 
 void main() {
     // ambient
-    vec3 rgb = texture(material.diffuse, texCoord).rgb;
+    vec3 rgb = material.diffuse;
     vec3 ambient = light.ambient * rgb;
 
     // diffuse
@@ -36,6 +47,7 @@ void main() {
     vec3 lightDir = normalize(light.direction);
     float dotNormLight = dot(norm, lightDir);
     float diff = max(dotNormLight, 0.0);
+    diff = quantize(diff);
     vec3 diffuse = light.diffuse * diff * rgb;
 
     // specular
@@ -44,6 +56,7 @@ void main() {
     float spec = 0.0;
     if (dotNormLight > 0.0) {
         spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+        spec = quantize(spec);
     }
     vec3 specular = light.specular * spec * material.specular;
 
