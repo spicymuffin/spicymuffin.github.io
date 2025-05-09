@@ -10,11 +10,8 @@ in vec2 texCoord;
 
 float quantize(float target)
 {
-    if (target < 0.01) return target;
-
     float stepsize = 1.0 / float(u_quantization_level);
-
-    target = floor(target / stepsize) * stepsize + stepsize;
+    target = round(target / stepsize) * stepsize;
     return target;
 }
 

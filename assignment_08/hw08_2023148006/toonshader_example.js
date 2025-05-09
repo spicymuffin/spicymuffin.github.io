@@ -15,7 +15,7 @@ let viewMatrix = mat4.create();
 let projMatrix = mat4.create();
 let modelMatrix = mat4.create();
 let arcBallMode = 'CAMERA';     // 'CAMERA' or 'MODEL'
-let toonLevels = 5;             // number of toon levels (1 to 5)
+let toonLevels = 3;             // number of toon levels (1 to 5)
 
 const cylinder = new Cylinder(gl, 32);
 const axes = new Axes(gl, 1.5); // create an Axes object with the length of axis 1.5
@@ -80,7 +80,7 @@ function setupKeyboardEvents() {
         }
         else if (event.key >= '1' && event.key <= '5') {
             toonLevels = parseInt(event.key);
-           // console.log("toon levels: " + toonLevels);
+            // console.log("toon levels: " + toonLevels);
             updateText(textOverlay3, "toon levels: " + toonLevels);
             render();
         }
@@ -126,7 +126,7 @@ function render() {
     shader.setMat4('u_model', modelMatrix);
     shader.setMat4('u_view', viewMatrix);
     shader.setVec3('u_viewPos', cameraPos);
-    
+
     shader.setInt("u_quantization_level", toonLevels); // quantization level for toon shading
     cylinder.draw(shader);
 
@@ -177,7 +177,7 @@ async function main() {
         shader.setFloat("material.shininess", shininess);
         shader.setVec3("u_viewPos", cameraPos);
 
-        shader.setInt("u_quantization_level", 1); // quantization level for toon shading
+        shader.setInt("u_quantization_level", toonLevels); // quantization level for toon shading
 
         // bind the texture to the shader
         // gl.activeTexture(gl.TEXTURE0);
