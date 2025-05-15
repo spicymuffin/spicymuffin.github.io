@@ -11,7 +11,7 @@ const scene = new THREE.Scene();
 scene.backgroundColor = 0x000000;  // black
 
 // Perspective camera: fov, aspect ratio, near, far
-let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+let camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
 
 // set camera position: camera.position.set(-3, 8, 2) 가 더 많이 사용됨 (약간 빠름))
 camera.position.set(0, 50, -50); // camera의 위치
@@ -55,7 +55,7 @@ orbitControls.enableDamping = true; // 관성효과, 바로 멈추지 않고 부
 orbitControls.dampingFactor = 0.25; // 감속 정도, 크면 더 빨리 감속, default = 0.05
 
 // add GUI: 간단한 user interface를 제작 가능
-// 사용법은 https://lil-gui.georgealways.com/ 
+// 사용법은 https://lil-gui.georgealways.com/
 // http://yoonbumtae.com/?p=942 참고
 
 const gui = new GUI();
@@ -64,10 +64,10 @@ const controls = new function () {
     this.switchCamera = function () {
         if (camera instanceof THREE.PerspectiveCamera) {
             scene.remove(camera);
-            camera = null; // 기존의 camera 제거    
+            camera = null; // 기존의 camera 제거
             // OrthographicCamera(left, right, top, bottom, near, far)
             camera = new THREE.OrthographicCamera(window.innerWidth / -16,
-                window.innerWidth / 16, window.innerHeight / 16, window.innerHeight / -16, -200, 500);
+                window.innerWidth / 16, window.innerHeight / 16, window.innerHeight / -16, -200, 10000);
             camera.position.set(0, 50, -50);
             camera.lookAt(scene.position);
             orbitControls.dispose(); // 기존의 orbitControls 제거
@@ -78,7 +78,7 @@ const controls = new function () {
         } else {
             scene.remove(camera);
             camera = null;
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
             camera.position.set(0, 50, -50);
             camera.lookAt(scene.position);
             orbitControls.dispose(); // 기존의 orbitControls 제거
@@ -161,6 +161,8 @@ scene.add(dirLight);
 //light.target = targetObject;
 //scene.add(light);
 
+const textureLoader = new THREE.TextureLoader();
+
 
 const SunGeometry = new THREE.SphereGeometry(10);
 const SunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
@@ -169,23 +171,43 @@ SunMesh.position.set(0, 0, 0);
 scene.add(SunMesh);
 
 const MercuryGeometry = new THREE.SphereGeometry(1.5);
-const MercuryMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
+const MercuryTexture = textureLoader.load('Mercury.jpg');
+const MercuryMaterial = new THREE.MeshStandardMaterial({
+    map: MercuryTexture,
+    roughness: 0.8,
+    metalness: 0.2,
+});
 const MercuryMesh = new THREE.Mesh(MercuryGeometry, MercuryMaterial);
 MercuryMesh.position.set(20, 0, 0);
 scene.add(MercuryMesh);
 
-const VenusGeometry = new THREE.SphereGeometry(3, 32, 32);
-const VenusMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+const VenusGeometry = new THREE.SphereGeometry(3);
+const VenusTexture = textureLoader.load('Venus.jpg');
+const VenusMaterial = new THREE.MeshStandardMaterial({
+    map: VenusTexture,
+    roughness: 0.8,
+    metalness: 0.2,
+});
 const VenusMesh = new THREE.Mesh(VenusGeometry, VenusMaterial);
 VenusMesh.position.set(35, 0, 0);
 scene.add(VenusMesh);
-const EarthGeometry = new THREE.SphereGeometry(3.5, 32, 32);
-const EarthMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+const EarthGeometry = new THREE.SphereGeometry(3.5);
+const EarthTexture = textureLoader.load('Earth.jpg');
+const EarthMaterial = new THREE.MeshStandardMaterial({
+    map: EarthTexture,
+    roughness: 0.8,
+    metalness: 0.2
+});
 const EarthMesh = new THREE.Mesh(EarthGeometry, EarthMaterial);
 EarthMesh.position.set(50, 0, 0);
 scene.add(EarthMesh);
-const MarsGeometry = new THREE.SphereGeometry(2.5, 32, 32);
-const MarsMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+const MarsGeometry = new THREE.SphereGeometry(1.5);
+const MarsTexture = textureLoader.load('Mars.jpg');
+const MarsMaterial = new THREE.MeshStandardMaterial({
+    map: MarsTexture,
+    roughness: 0.8,
+    metalness: 0.2
+});
 const MarsMesh = new THREE.Mesh(MarsGeometry, MarsMaterial);
 MarsMesh.position.set(65, 0, 0);
 scene.add(MarsMesh);
@@ -228,7 +250,7 @@ function animate() {
     // 모든 transformation 적용 후, renderer에 렌더링을 한번 해 줘야 함
     renderer.render(scene, camera);
 
-    // 다음 frame을 위해 requestAnimationFrame 호출 
+    // 다음 frame을 위해 requestAnimationFrame 호출
     requestAnimationFrame(animate);
 }
 
