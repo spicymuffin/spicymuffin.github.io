@@ -162,32 +162,32 @@ scene.add(dirLight);
 //scene.add(light);
 
 
-const SunGeometry = new THREE.SphereGeometry(1, 32, 32);
+const SunGeometry = new THREE.SphereGeometry(10);
 const SunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 const SunMesh = new THREE.Mesh(SunGeometry, SunMaterial);
 SunMesh.position.set(0, 0, 0);
 scene.add(SunMesh);
 
-const MercuryGeometry = new THREE.SphereGeometry(0.2, 32, 32);
+const MercuryGeometry = new THREE.SphereGeometry(1.5);
 const MercuryMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
 const MercuryMesh = new THREE.Mesh(MercuryGeometry, MercuryMaterial);
-MercuryMesh.position.set(2, 0, 0);
+MercuryMesh.position.set(20, 0, 0);
 scene.add(MercuryMesh);
 
-const VenusGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+const VenusGeometry = new THREE.SphereGeometry(3, 32, 32);
 const VenusMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
 const VenusMesh = new THREE.Mesh(VenusGeometry, VenusMaterial);
-VenusMesh.position.set(3, 0, 0);
+VenusMesh.position.set(35, 0, 0);
 scene.add(VenusMesh);
-const EarthGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+const EarthGeometry = new THREE.SphereGeometry(3.5, 32, 32);
 const EarthMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
 const EarthMesh = new THREE.Mesh(EarthGeometry, EarthMaterial);
-EarthMesh.position.set(4, 0, 0);
+EarthMesh.position.set(50, 0, 0);
 scene.add(EarthMesh);
-const MarsGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+const MarsGeometry = new THREE.SphereGeometry(2.5, 32, 32);
 const MarsMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 const MarsMesh = new THREE.Mesh(MarsGeometry, MarsMaterial);
-MarsMesh.position.set(5, 0, 0);
+MarsMesh.position.set(65, 0, 0);
 scene.add(MarsMesh);
 
 let MercuryAngle = 0;
@@ -204,23 +204,23 @@ function animate() {
     // Mercury의 회전과 공전
     MercuryAngle += controls.MercuryOrbitSpeed;
     MercuryMesh.rotation.y += controls.MercuryRotSpeed;
-    MercuryMesh.position.x = 2 * Math.cos(MercuryAngle);
-    MercuryMesh.position.z = 2 * Math.sin(MercuryAngle);
+    MercuryMesh.position.x = 20 * Math.cos(MercuryAngle);
+    MercuryMesh.position.z = 20 * Math.sin(MercuryAngle);
     // Venus의 회전과 공전
     VenusAngle += controls.VenusOrbitSpeed;
     VenusMesh.rotation.y += controls.VenusRotSpeed;
-    VenusMesh.position.x = 3 * Math.cos(VenusAngle);
-    VenusMesh.position.z = 3 * Math.sin(VenusAngle);
+    VenusMesh.position.x = 35 * Math.cos(VenusAngle);
+    VenusMesh.position.z = 35 * Math.sin(VenusAngle);
     // Earth의 회전과 공전
     EarthAngle += controls.EarthOrbitSpeed;
     EarthMesh.rotation.y += controls.EarthRotSpeed;
-    EarthMesh.position.x = 4 * Math.cos(EarthAngle);
-    EarthMesh.position.z = 4 * Math.sin(EarthAngle);
+    EarthMesh.position.x = 50 * Math.cos(EarthAngle);
+    EarthMesh.position.z = 50 * Math.sin(EarthAngle);
     // Mars의 회전과 공전
     MarsAngle += controls.MarsOrbitSpeed;
     MarsMesh.rotation.y += controls.MarsRotSpeed;
-    MarsMesh.position.x = 5 * Math.cos(MarsAngle);
-    MarsMesh.position.z = 5 * Math.sin(MarsAngle);
+    MarsMesh.position.x = 65 * Math.cos(MarsAngle);
+    MarsMesh.position.z = 65 * Math.sin(MarsAngle);
     // 각각의 구체에 대해 rotation transformation
     // 각각의 구체에 대해 translation transformation
 
