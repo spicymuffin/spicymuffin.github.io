@@ -202,22 +202,22 @@ function animate() {
     orbitControls.update();
 
     // Mercury의 회전과 공전
-    MercuryAngle += controls.MercuryRotSpeed;
+    MercuryAngle += controls.MercuryOrbitSpeed;
     MercuryMesh.rotation.y += controls.MercuryRotSpeed;
     MercuryMesh.position.x = 2 * Math.cos(MercuryAngle);
     MercuryMesh.position.z = 2 * Math.sin(MercuryAngle);
     // Venus의 회전과 공전
-    VenusAngle += controls.VenusRotSpeed;
+    VenusAngle += controls.VenusOrbitSpeed;
     VenusMesh.rotation.y += controls.VenusRotSpeed;
     VenusMesh.position.x = 3 * Math.cos(VenusAngle);
     VenusMesh.position.z = 3 * Math.sin(VenusAngle);
     // Earth의 회전과 공전
-    EarthAngle += controls.EarthRotSpeed;
+    EarthAngle += controls.EarthOrbitSpeed;
     EarthMesh.rotation.y += controls.EarthRotSpeed;
     EarthMesh.position.x = 4 * Math.cos(EarthAngle);
     EarthMesh.position.z = 4 * Math.sin(EarthAngle);
     // Mars의 회전과 공전
-    MarsAngle += controls.MarsRotSpeed;
+    MarsAngle += controls.MarsOrbitSpeed;
     MarsMesh.rotation.y += controls.MarsRotSpeed;
     MarsMesh.position.x = 5 * Math.cos(MarsAngle);
     MarsMesh.position.z = 5 * Math.sin(MarsAngle);
