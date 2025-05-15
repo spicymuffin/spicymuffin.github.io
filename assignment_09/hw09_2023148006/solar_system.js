@@ -1,6 +1,6 @@
 
 // main three.module.js library
-import * as THREE from 'three';  
+import * as THREE from 'three';
 
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import Stats from 'three/addons/libs/stats.module.js';
@@ -66,7 +66,7 @@ const controls = new function () {
             scene.remove(camera);
             camera = null; // 기존의 camera 제거    
             // OrthographicCamera(left, right, top, bottom, near, far)
-            camera = new THREE.OrthographicCamera(window.innerWidth / -16, 
+            camera = new THREE.OrthographicCamera(window.innerWidth / -16,
                 window.innerWidth / 16, window.innerHeight / 16, window.innerHeight / -16, -200, 500);
             camera.position.set(0, 50, -50);
             camera.lookAt(scene.position);
@@ -77,7 +77,7 @@ const controls = new function () {
             this.perspective = "Orthographic";
         } else {
             scene.remove(camera);
-            camera = null; 
+            camera = null;
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 50, -50);
             camera.lookAt(scene.position);
