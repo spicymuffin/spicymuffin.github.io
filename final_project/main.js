@@ -5,6 +5,8 @@ import { initStats, initRenderer, initCamera, initDefaultLighting, initDefaultDi
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
+import { IKChain } from './IKChain.js';
+
 import * as objutils from './objutils.js';
 
 const scene = new THREE.Scene();
@@ -47,8 +49,20 @@ scene.add(box);
 const cameraControls = new EditorCameraControls(camera, renderer.domElement);
 const transformControls = new EditorControls(scene, camera, renderer.domElement, cameraControls, { mode: 'translate' });
 
-const IK_target = new objutils.createSphere();
-scene.add(IK_target);
+const ntargets = 5;
+const IK_targets = [];
+IK_targets.length = ntargets;
+
+for (let i = 0; i < ntargets; i++) {
+    const target = objutils.createSphere({ radius: 2, color: 0xff0000 });
+    target.name = `IK_target_${i}`;
+    target.position.set(Math.random() * 10 - 5, Math.random() * 10 + 15, Math.random() * 10 + 5);
+    IK_targets[i] = target;
+    scene.add(target);
+}
+
+const IKSolver = new FabrIKSolver(IK_targets, box, 0.5, 10);
+
 
 cameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
