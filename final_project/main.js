@@ -47,6 +47,9 @@ scene.add(box);
 const cameraControls = new EditorCameraControls(camera, renderer.domElement);
 const transformControls = new EditorControls(scene, camera, renderer.domElement, cameraControls, { mode: 'translate' });
 
+const IK_target = new objutils.createSphere();
+scene.add(IK_target);
+
 cameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
 function render() {

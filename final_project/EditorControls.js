@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import * as util from './util.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import * as util from "./util.js"
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 export class EditorControls {
     constructor(scene, camera, domElement, cameraControls = null, options = {}) {
@@ -8,6 +9,9 @@ export class EditorControls {
         this.camera = camera;
         this.domElement = domElement;
         this.cameraControls = cameraControls;
+
+        this.gui = new GUI();
+        this.selectedObjGUIFolder = null;
 
         // TODO: add support for options.selctables
         // selectMode 1: all meshes on scene
@@ -22,6 +26,8 @@ export class EditorControls {
         scene.add(this.transform);
 
         this.enabled = true;
+
+        this.attachedObject = null;
 
         this.transform.addEventListener('dragging-changed', (e) => {
             if (this.cameraControls && 'enabled' in this.cameraControls) {
@@ -52,13 +58,13 @@ export class EditorControls {
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
         const target = intersects.find(hit => !util.isChildOf(hit.object, this.transform));
 
-        console.log("intersects:", intersects.map(i => i.object.name || i.object));
+        console.log('intersects:', intersects.map(i => i.object.name || i.object));
 
         if (target) {
-            console.log("target:", target.object.name || target.object);
+            console.log('target:', target.object.name || target.object);
             this.attach(target.object);
         } else {
-            console.log("no target found");
+            console.log('no target found');
             this.detach();
         }
     }
@@ -79,10 +85,54 @@ export class EditorControls {
 
     attach(object) {
         this.transform.attach(object);
+        this.attachedObject = object;
+
+        // clear previous GUI folder
+        if (this.selectedObj) {
+            this.selectedObj.destroy();
+        }
+        this.selectedObj = this.gui.addFolder('Selected Object');
+
+        // add properties to the GUI
+        const objectID = { name: object.name || object.uuid };
+        this.selectedObj.add(objectID, 'name').name('Name').listen();
+
+        const positionFolder = this.selectedObj.addFolder('Position');
+        positionFolder.add(object.position, 'x').step(0.01).listen();
+        positionFolder.add(object.position, 'y').step(0.01).listen();
+        positionFolder.add(object.position, 'z').step(0.01).listen();
+
+        // TODO: although the transform contorls thing uses quaternions,
+        // reading the rotation from object.rotation gives euler angles that are prone to gimbal lock
+        // and are not the same as the transform controls's rotation
+
+        // a good solution would be adding a euler angle property to 3d objects and listening to that
+        // ofc we would need to convert the quaternion to euler angles when we want to read the rotation
+        // and vice versa when we want to set the rotation
+
+        const rotationFolder = this.selectedObj.addFolder('Rotation');
+        rotationFolder.add(object.rotation, 'x').step(0.01).listen();
+        rotationFolder.add(object.rotation, 'y').step(0.01).listen();
+        rotationFolder.add(object.rotation, 'z').step(0.01).listen();
+
+        const scaleFolder = this.selectedObj.addFolder('Scale');
+        scaleFolder.add(object.scale, 'x').step(0.01).listen();
+        scaleFolder.add(object.scale, 'y').step(0.01).listen();
+        scaleFolder.add(object.scale, 'z').step(0.01).listen();
+
+        this.selectedObj.open();
+        positionFolder.open();
+        rotationFolder.open();
+        scaleFolder.open();
     }
 
     detach() {
         this.transform.detach();
+        this.attachedObject = null;
+        if (this.selectedObj) {
+            this.selectedObj.destroy();
+            this.selectedObj = null;
+        }
     }
 
     enable() {
