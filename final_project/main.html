@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+    <!-- CDN (Content Delivery Network)을 사용, importmap 설정 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="./util.js"></script>
+    <script type="module" src="./main.js"></script>
+    <script type="module" src="./EditorCameraControls.js"></script>
+</head>
+
+<body>
+</body>
+
+</html>
