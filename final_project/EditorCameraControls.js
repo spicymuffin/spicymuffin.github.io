@@ -137,5 +137,6 @@ export class EditorCameraControls {
         this.domElement.removeEventListener('mousedown', this._onMouseDown);
         document.removeEventListener('mouseup', this._onMouseUp);
         document.removeEventListener('mousemove', this._onMouseMove);
+        document.removeEventListener('wheel', this._onMouseScroll);
     }
 }
