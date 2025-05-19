@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { initStats, initRenderer, initCamera, initDefaultLighting, initDefaultDirectionalLighting } from './util.js';
+import { initStats, initRenderer, initCamera, initDefaultLighting, initDefaultDirectionalLighting } from './setup.js';
 
 import { EditorCameraControls } from './EditorCameraControls.js';
 
