@@ -5,6 +5,8 @@ import { initStats, initRenderer, initCamera, initDefaultLighting, initDefaultDi
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
+import * as objutils from './objutils.js';
+
 const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
@@ -37,10 +39,15 @@ initDefaultDirectionalLighting(scene);
 //     scene.add(mesh);
 // });
 
-
+const groundPlane = objutils.createGroundPlane(false);
+scene.add(groundPlane);
+const box = objutils.createBox();
+scene.add(box);
 
 const cameraControls = new EditorCameraControls(camera, renderer.domElement);
 const transformControls = new EditorControls(scene, camera, renderer.domElement, cameraControls, { mode: 'translate' });
+
+cameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
 function render() {
     requestAnimationFrame(render);

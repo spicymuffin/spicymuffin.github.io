@@ -8,7 +8,7 @@ export class EditorCameraControls {
         this.enabled = true;
 
         this.moveSpeed = 10;
-        this.lookSpeed = 0.002;
+        this.sensitivity = 0.002;
 
         this.defaultSpeed = 10;
         this.accelSpeed = 20;
@@ -23,10 +23,50 @@ export class EditorCameraControls {
             accel: false,
         };
 
+        this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+        this.pitch = 0;
+        this.yaw = 0;
+
         this.isDragging = false;
         this.dragStart = new THREE.Vector2();
 
         this._bindEvents();
+    }
+
+    // accepts a target of type THREE.Object3D or THREE.Vector3
+    // use to init rotation. this will also alter the yaw and pitch vars.
+    lookAt(target) {
+        this.camera.rotation.z = 0;
+
+        const up = new THREE.Vector3(0, 1, 0);
+        const targetPosition = new THREE.Vector3();
+        if (target instanceof THREE.Object3D) {
+            targetPosition.setFromMatrixPosition(target.matrixWorld);
+        } else if (target instanceof THREE.Vector3) {
+            targetPosition.copy(target);
+        } else {
+            alert("invalid target for lookAt");
+            return;
+        }
+
+        // compute forward vector (negative Z in camera space)
+        const zAxis = new THREE.Vector3().subVectors(this.camera.position, targetPosition).normalize();
+
+        // compute right vector
+        const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+
+        // recompute orthogonal up vector
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+        // build the rotation matrix
+        const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+
+        // apply rotation matrix to object
+        this.camera.quaternion.setFromRotationMatrix(rotMatrix);
+        this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
+        this.pitch = this.euler.x;
+        this.yaw = this.euler.y;
     }
 
     _bindEvents() {
@@ -93,17 +133,19 @@ export class EditorCameraControls {
     _onMouseMove(e) {
         if (!this.enabled || !this.isDragging) return;
 
-        const movementX = e.movementX || 0;
-        const movementY = e.movementY || 0;
+        const dx = e.movementX || 0;
+        const dy = e.movementY || 0;
 
-        this.camera.rotation.order = 'YXZ'; // yaw-pitch-roll
+        /* accumulate yaw / pitch */
+        this.yaw -= dx * this.sensitivity;
+        this.pitch -= dy * this.sensitivity;
 
-        this.camera.rotation.y -= movementX * this.lookSpeed;
-        this.camera.rotation.x -= movementY * this.lookSpeed;
-
+        /* clamp pitch to avoid flipping */
         const PI_2 = Math.PI / 2;
-        this.camera.rotation.x = Math.max(-PI_2, Math.min(PI_2, this.camera.rotation.x));
-        // this.camera.rotation.z = 0;
+        this.pitch = Math.max(-PI_2, Math.min(PI_2, this.pitch));
+
+        this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
+        this.camera.quaternion.setFromEuler(this.euler);
     }
 
     update(delta) {

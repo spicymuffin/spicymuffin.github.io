@@ -15,6 +15,9 @@ export class EditorControls {
         // this.selectMode = 1;
 
         this.transform = new TransformControls(camera, domElement);
+
+        // TODO: add support for options.space
+        this.transform.setSpace(options.space || 'world');
         this.transform.setMode(options.mode || 'translate');
         scene.add(this.transform);
 
@@ -67,6 +70,10 @@ export class EditorControls {
             case 't': this.transform.setMode('translate'); break;
             case 'r': this.transform.setMode('rotate'); break;
             case 'y': this.transform.setMode('scale'); break;
+
+            case '1': this.transform.setSpace('local'); break;
+            case '2': this.transform.setSpace('world'); break;
+            // TODO: add other spaces
         }
     }
 
