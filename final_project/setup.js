@@ -42,8 +42,8 @@ export function initCanvasRenderer() {
     return canvasRenderer;
 }
 
-export function initCamera(initialPosition) {
-    const position = (initialPosition !== undefined) ? initialPosition : new THREE.Vector3(30, 30, 30);
+export function initCamera(options = {}) {
+    const position = options.position || new THREE.Vector3(10, 10, 10);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
     camera.position.copy(position);

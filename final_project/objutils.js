@@ -28,7 +28,7 @@ export function createBox(options = {}) {
 // options.position = THREE.Vector3
 // options.rotation = THREE.Vector3 (in radians; why would you want to rotate a sphere?)
 export function createSphere(options = {}) {
-    const radius = options.size || 1;
+    const radius = options.radius || 1;
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
     const matColor = options.color || 0x00ff00;
