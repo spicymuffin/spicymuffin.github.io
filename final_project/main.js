@@ -58,7 +58,7 @@ for (let i = 0; i < nbones; i++) {
     const b = new THREE.Bone();
     b.name = `bone_${i}`;
 
-    b.position.set(0, 0, 1);
+    b.position.set(0, 0, 3);
     // console.log(b.position);
 
     // let dbgSphere = objutils.createSphere({ radius: 0.2, color: 0x00ff00 });

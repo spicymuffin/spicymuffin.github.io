@@ -112,6 +112,12 @@ export class IKChain {
             this.sceneRef.add(this.proxyJoints[i]);
         }
 
+        // set the root joint to be the last joint in the chain
+        this.rootPos = new THREE.Vector3().copy(this.proxyJoints[this.proxyJoints.length - 1].position);
+        if (options.rootPos) {
+            this.rootPos.copy(options.rootPos);
+        }
+
         // calculate the distance between the joints
         this.jointDistances = [];
         for (let i = 0; i < this.proxyJoints.length - 1; i++) {
@@ -148,11 +154,10 @@ export class IKChain {
     // TODO: add CCD...?
     solve(target, tolerance = 0.1, maxIterations = 10) {
         target.updateWorldMatrix(true, false);
-        let iterationTargetPos = target.getWorldPosition(new THREE.Vector3());
-        let iterationTargetQuat = target.getWorldQuaternion(new THREE.Quaternion());
-
-        this.doForwardPass(iterationTargetPos, iterationTargetQuat);
-        this.doBackwardPass();
+        let targetPos = target.getWorldPosition(new THREE.Vector3());
+        let targetQuat = target.getWorldQuaternion(new THREE.Quaternion());
+        this.doForwardPass(targetPos, targetQuat);
+        this.doBackwardPass(this.rootPos);
     }
 
     doForwardPass(targetPos, targetQuat) {
@@ -207,7 +212,52 @@ export class IKChain {
         }
     }
 
-    doBackwardPass() {
-        
+    doBackwardPass(rootPos) {
+        this.proxyJoints[this.proxyJoints.length - 1].position.copy(rootPos);
+        // we dont need to set the rotation of the root joint, since that will be handled by constraints
+
+        // iterate over the joints
+        for (let i = this.proxyJoints.length - 2; i >= 0; i--) {
+            // forward is +Y
+            // poleref is +Z
+            // pole/forward ortho is +X
+
+            // i+1th joint is the parent of the ith joint
+            let forward = new THREE.Vector3().subVectors(this.proxyJoints[i].position, this.proxyJoints[i + 1].position).normalize();
+
+            // get pole object
+            let pole = this.lookupPole(i);
+
+            // get pole direction (if its already a vector, getPoleDirection returns the vector)
+            let poleDir = pole.getPoleDirection(this.proxyJoints[i].position).clone();
+
+            // project the pole direction onto the forward directio for accuracy
+            poleDir.sub(forward.clone().multiplyScalar(poleDir.dot(forward)));
+            poleDir.normalize();
+
+            // calculate pole/forward orthogonal direction
+            let poleForwardOrtho = new THREE.Vector3().crossVectors(forward, poleDir).normalize();
+
+            // recompute pole to forward orthogonal direction
+            let poleRef = new THREE.Vector3().crossVectors(poleForwardOrtho, forward).normalize();
+
+            poleForwardOrtho.crossVectors(forward, poleRef).normalize();
+
+            if (this.debug) {
+                // // draw the basis
+                // const basis = objutils.drawArrows(this.proxyJoints[i].position, poleForwardOrtho, forward, poleRef);
+                // this.sceneRef.add(basis);
+
+                // console.log(`joint ${i} position: ${this.proxyJoints[i].position.x}, ${this.proxyJoints[i].position.y}, ${this.proxyJoints[i].position.z}`);
+            }
+
+            let m = new THREE.Matrix4().makeBasis(poleForwardOrtho, forward, poleRef);
+            this.proxyJoints[i + 1].quaternion.setFromRotationMatrix(m);
+
+            // move the joint along the forward direction to compensate for the distance change
+            let dist = this.jointDistances[i];
+            this.proxyJoints[i].position.copy(this.proxyJoints[i + 1].position.clone().add(forward.clone().multiplyScalar(dist)));
+        }
+
     }
 }
