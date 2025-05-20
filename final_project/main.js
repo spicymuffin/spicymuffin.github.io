@@ -7,7 +7,7 @@ import * as objutils from './objutils.js';
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
-import { IKChain } from './IKChain.js';
+import { IKChain, IKJointConstraint, IKAxisConstraint, IKPole } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 const gui = new GUI();
@@ -81,7 +81,40 @@ scene.add(bones[0]);
 // bones[2].quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 3);
 // bones[3].quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 3);
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, null, null, { debug: true });
+let constraints = [];
+// constraints.push(new IKAxisConstraint(
+//     1,                             // joint index in the chain
+//     new THREE.Vector3(1, 0, 0),    // axis (world X)
+//     {
+//         project: false,            // false = allow motion in plane ⟂ axis
+//         local: false               // axis is in world space
+//         // reference: optional Object3D to define axis dynamically
+//     }
+// ));
+
+// constraints.push(new IKAxisConstraint(
+//     2,                             // joint index in the chain
+//     new THREE.Vector3(1, 0, 0),    // axis (world X)
+//     {
+//         project: false,            // false = allow motion in plane ⟂ axis
+//         local: false               // axis is in world space
+//         // reference: optional Object3D to define axis dynamically
+//     }
+// ));
+
+// constraints.push(new IKAxisConstraint(
+//     3,                             // joint index in the chain
+//     new THREE.Vector3(1, 0, 0),    // axis (world X)
+//     {
+//         project: false,            // false = allow motion in plane ⟂ axis
+//         local: false               // axis is in world space
+//         // reference: optional Object3D to define axis dynamically
+//     }
+// ));
+
+
+
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, null, { debug: true });
 
 let realtimeIK = false;
 
