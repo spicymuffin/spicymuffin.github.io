@@ -18,31 +18,71 @@ export function createBox(options = {}) {
     let position = options.position || new THREE.Vector3(0, 0, 0);
     cube.position.set(position.x, position.y, position.z);
 
-    let rotation = options.rotation || new THREE.Vector3(0, 0, 0);
-    cube.rotation.set(rotation.x, rotation.y, rotation.z);
+    const rotation = options.rotation || new THREE.Quaternion();
+    cube.quaternion.copy(rotation);
     return cube;
 }
 
 // generates a sphere mesh with a given radius
 // options.size = radius (number)
 // options.position = THREE.Vector3
-// options.rotation = THREE.Vector3 (in radians; why would you want to rotate a sphere?)
+// options.rotation = THREE.Vector3 (quaternion)
 export function createSphere(options = {}) {
     const radius = options.radius || 1;
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
     const matColor = options.color || 0x00ff00;
-    const material = new THREE.MeshLambertMaterial({ color: matColor });
+    const material = new THREE.MeshLambertMaterial({
+        color: matColor,
+        transparent: options.transparent || false,
+        opacity: options.opacity !== undefined ? options.opacity : 1.0
+    });
 
     const sphere = new THREE.Mesh(geometry, material);
 
     const position = options.position || new THREE.Vector3(0, 0, 0);
     sphere.position.set(position.x, position.y, position.z);
 
-    const rotation = options.rotation || new THREE.Vector3(0, 0, 0);
-    sphere.rotation.set(rotation.x, rotation.y, rotation.z);
+    const rotation = options.rotation || new THREE.Quaternion();
+    sphere.quaternion.copy(rotation);
 
     return sphere;
+}
+
+export function drawArrows(origin, xVec, yVec, zVec, shaftRadius = 0.02, headLengthRatio = 0.1, headWidthRatio = 2) {
+    const group = new THREE.Group();
+
+    function createArrow(dirVec, color) {
+        const length = dirVec.length();
+        if (length === 0) return null;
+
+        const direction = dirVec.clone().normalize();
+        const arrow = new THREE.ArrowHelper(
+            direction,
+            origin.clone(),
+            length,
+            color,
+            length * headLengthRatio,
+            shaftRadius * headWidthRatio
+        );
+
+        const shaftGeom = new THREE.CylinderGeometry(shaftRadius, shaftRadius, length - length * headLengthRatio, 8);
+        const shaftMat = new THREE.MeshBasicMaterial({ color });
+        const shaft = new THREE.Mesh(shaftGeom, shaftMat);
+
+        shaft.position.copy(origin.clone().add(dirVec.clone().multiplyScalar(0.5 - headLengthRatio * 0.5)));
+        shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+
+        group.add(arrow);
+        group.add(shaft);
+        return arrow;
+    }
+
+    createArrow(xVec, 0xff0000); // x is red
+    createArrow(yVec, 0x00ff00); // y is green
+    createArrow(zVec, 0x0000ff); // z is blue
+
+    return group;
 }
 
 export function createDefaultCubeAndSphere() {

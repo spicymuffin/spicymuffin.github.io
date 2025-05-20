@@ -6,15 +6,18 @@ import * as objutils from './objutils.js';
 
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
-import { EditorAxisGizmo } from './EditorAxisGizmo.js';
 
 import { IKChain } from './IKChain.js';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
+const gui = new GUI();
+gui.domElement.style.position = 'absolute';
+gui.domElement.style.right = '265px';
 
 const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
-const camera = initCamera({ position: { x: -10, y: 10, z: -10 } });
+const camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
 const clock = new THREE.Clock();
 
 initDefaultLighting(scene);
@@ -23,24 +26,26 @@ initDefaultDirectionalLighting(scene);
 const groundPlane = objutils.createGroundPlane(false);
 groundPlane.position.y = -2;
 scene.add(groundPlane);
+const axis = new THREE.AxesHelper(10);
+axis.position.set(0, -2, 0);
+axis.raycast = () => { };
+scene.add(axis);
 // const box = objutils.createBox();
 // scene.add(box);
 
 const editorCameraControls = new EditorCameraControls(camera, renderer.domElement);
 const transformControls = new EditorControls(scene, camera, renderer.domElement, editorCameraControls, { mode: 'translate' });
 
-const axisGizmo = new EditorAxisGizmo(camera, 100);
-renderer.domElement.parentElement.style.position = 'relative';
-renderer.domElement.parentElement.appendChild(axisGizmo.dom);
+editorCameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
 const ntargets = 1;
 const IK_targets = [];
 IK_targets.length = ntargets;
 
 for (let i = 0; i < ntargets; i++) {
-    const target = objutils.createSphere({ radius: 2, color: 0xff0000 });
+    const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
     target.name = `IK_target_${i}`;
-    target.position.set(Math.random() * 10 - 5, Math.random() * 10 + 15, Math.random() * 10 + 5);
+    target.position.set(0, 0, 6);
     IK_targets[i] = target;
     scene.add(target);
 }
@@ -72,13 +77,27 @@ for (let i = 0; i < nbones; i++) {
 
 scene.add(bones[0]);
 
-// const axis = new THREE.Vector3(1, 0, 0);
-// const angle = Math.PI / 2;
-// bones[1].quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axis, angle));
+// bones[1].quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 3);
+// bones[2].quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 3);
+// bones[3].quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 3);
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, { debug: true });
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, null, null, { debug: true });
 
-editorCameraControls.lookAt(new THREE.Vector3(0, 0, 0));
+let realtimeIK = false;
+
+const actions = {
+    runSolver: () => {
+        testIKChain.solve(IK_targets[0], 0.1, 10);
+    },
+
+    flipRealtimeIK: () => {
+        realtimeIK = !realtimeIK;
+    },
+};
+
+// add a button
+gui.add(actions, 'runSolver').name('Solve IK');
+gui.add(actions, 'flipRealtimeIK').name('Realtime IK');
 
 function render() {
     requestAnimationFrame(render);
@@ -86,11 +105,13 @@ function render() {
 
     // update camera controls
     editorCameraControls.update(delta);
-    // update axis gizmo
-    axisGizmo.update();
 
     // render the scene
     renderer.render(scene, camera);
+
+    if (realtimeIK) {
+        testIKChain.solve(IK_targets[0], 0.1, 10);
+    }
 
     // GUI
     stats.update();
