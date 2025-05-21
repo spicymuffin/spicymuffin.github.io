@@ -40,24 +40,25 @@ export class IKAxisConstraint extends IKJointConstraint {
     }
 }
 
-// only pass this world space vectors
+// only pass this world space locations
+// also the polePosition is a reference, so updating the polePosition will update the IKPole
+// by default, the pole also defines the rotation of the joint too. the joint will align its +Z axis to the pole direction
 export class IKPole {
-    constructor(pole, vector = true) {
-        this.isVector = vector;
-
-        if (vector) {
-            this.pole = pole.clone().normalize();
-        } else {
-            this.target = pole.clone();
-        }
+    constructor(poleObject, strength = 0.1) {
+        this.poleObject = poleObject;
+        this.strength = strength;
     }
 
-    getPoleDirection(origin) {
-        if (this.isVector) {
-            return this.pole.clone().normalize();
-        } else {
-            return this.target.clone().sub(origin).normalize();
-        }
+    // return anonymous pole direction
+    getPoleDirectionVector(origin) {
+        // update world matrix
+        this.poleObject.updateWorldMatrix(true, false);
+        // get the pole direction in world space
+        const poleDir = this.poleObject.getWorldPosition(new THREE.Vector3());
+        poleDir.sub(origin).normalize();
+
+        // console.log(this.poleObject.name, 'poleDir:', poleDir.x, poleDir.y, poleDir.z);
+        return poleDir;
     }
 }
 
@@ -81,7 +82,6 @@ export class IKChain {
 
         // default pole is above the IK chain
         this.defaultPole = options.defaultPole || null;
-        this.poleBiasStrength = options.poleBiasStrength || 0.2;
 
         if (constraints) {
             this.constraints = constraints;
@@ -93,8 +93,12 @@ export class IKChain {
         if (poles) {
             this.poles = poles;
         } else {
+            // if no poles are given, create array of nulls
             this.poles = [];
             this.poles.length = njoints;
+            for (let i = 0; i < njoints; i++) {
+                this.poles[i] = null;
+            }
         }
 
         if (njoints < 2) {
@@ -137,15 +141,30 @@ export class IKChain {
 
         if (this.debug) {
             for (let i = 0; i < this.proxyJoints.length; i++) {
+                console.log(`adding proxy joint ${i} to scene`);
                 const sphere = objutils.createSphere({ radius: 0.2, color: 0xff00ff });
+                sphere.quaternion.copy(this.proxyJoints[i].quaternion);
+                sphere.name = `proxy_${i}`;
+
+                this.jointVisualizers.push(sphere);
+                this.proxyJoints[i].add(sphere);
                 const axis = new THREE.AxesHelper(0.6);
                 axis.raycast = () => { };
-                sphere.quaternion.copy(this.proxyJoints[i].quaternion);
                 sphere.add(axis);
-                this.jointVisualizers.push(sphere);
-                console.log(`adding proxy joint ${i} to scene`);
-                this.proxyJoints[i].add(sphere);
-                sphere.name = `proxy_${i}`;
+
+                // add a box to visualize the bone
+                if (i > 0) {
+                    const boneThickness = 0.02;
+                    const boneLength = this.jointDistances[i - 1];
+
+                    const bone = objutils.createBox({
+                        size: new THREE.Vector3(boneThickness, boneLength, boneThickness),
+                        color: 0xffffff,
+                        originShift: new THREE.Vector3(0, -0.5 * boneLength, 0)
+                    });
+
+                    sphere.add(bone);
+                }
             }
         }
 
@@ -161,28 +180,31 @@ export class IKChain {
         if (this.poles[index]) {
             return this.poles[index];
         } else {
-            // if no pole is defined, use the default pole if its given as an option
-            if (this.defaultPole) {
-                return this.defaultPole;
-            }
-            // if no default pole is given, use the joint's local +Z axis as the pole direction
-            const zLocal = new THREE.Vector3(0, 0, 1);
-            const joint = this.proxyJoints[index];
-
-            const worldZ = zLocal.applyQuaternion(joint.quaternion).normalize();
-
-            return new IKPole(worldZ, true);  // directional pole
+            return null;
         }
     }
 
     // solves using FABRIK
     // TODO: add CCD...?
-    solve(target, tolerance = 0.1, maxIterations = 10) {
-        target.updateWorldMatrix(true, false);
-        let targetPos = target.getWorldPosition(new THREE.Vector3());
-        let targetQuat = target.getWorldQuaternion(new THREE.Quaternion());
-        this.doForwardPass(targetPos, targetQuat);
-        this.doBackwardPass(this.rootPos);
+    solve(target, tolerance = 0.01, maxIterations = 50) {
+
+        for (let i = 0; i < maxIterations; i++) {
+            target.updateWorldMatrix(true, false);
+            let targetPos = target.getWorldPosition(new THREE.Vector3());
+            let targetQuat = target.getWorldQuaternion(new THREE.Quaternion());
+            this.doForwardPass(targetPos, targetQuat);
+            this.doBackwardPass(this.rootPos);
+
+            // check if the end effector is within tolerance of the target
+            // let dist = this.proxyJoints[0].position.distanceTo(targetPos);
+            // if (dist < tolerance) {
+            //     // if the end effector is within tolerance, we are done
+            //     if (this.debug) {
+            //         console.log(`FABRIK converged in ${i + 1} iterations`);
+            //     }
+            //     return;
+            // }
+        }
     }
 
     doForwardPass(targetPos, targetQuat) {
@@ -198,15 +220,38 @@ export class IKChain {
             // get pole object
             let pole = this.lookupPole(i);
 
-            // get pole direction (if its already a vector, getPoleDirection returns the vector)
-            let poleDir = pole.getPoleDirection(this.proxyJoints[i].position);
+            // if no pole is defined, we will use a default pole
+            let poleDir = null;
+            // if it is defined, we need to bias the joint towards the pole and also retreive the pole direction
+            if (pole) {
+                // get pole direction (if its already a vector, getPoleDirection returns the vector)
+                poleDir = pole.getPoleDirectionVector(this.proxyJoints[i].position);
+                // bias the joint position towards the pole
+                // compute a position for lerping
+                let biasPos = this.proxyJoints[i].position.clone().add(poleDir.clone());
+                // lerp towards the pole direction
+                this.proxyJoints[i].position.lerp(biasPos, pole.strength);
 
-            // bias the joint position towards the pole
-            // compute a position for lerping
-            let biasPos = this.proxyJoints[i].position.clone().add(poleDir.clone());
+                // const zLocal = new THREE.Vector3(0, 0, 1);
+                // const joint = this.proxyJoints[i];
+                // const worldZ = zLocal.applyQuaternion(joint.quaternion).normalize();
 
-            // lerp towards the pole direction
-            this.proxyJoints[i].position.lerp(biasPos, this.poleBiasStrength);
+                // poleDir = worldZ.clone();
+
+                // recalculate the pole direction since we moved the joint
+                poleDir = pole.getPoleDirectionVector(this.proxyJoints[i].position);
+            }
+            // if no pole defined, we will only disambiguate joint roll using the joint's local +Z axis
+            // unless some default parameters are given
+            // TODO: add support for default parameters
+            else {
+                // if no default pole is given, use the joint's local +Z axis as the pole direction
+                const zLocal = new THREE.Vector3(0, 0, 1);
+                const joint = this.proxyJoints[i];
+                const worldZ = zLocal.applyQuaternion(joint.quaternion).normalize();
+
+                poleDir = worldZ.clone();
+            }
 
             // calculate forward direction for the joint
             let forward = new THREE.Vector3().subVectors(this.proxyJoints[i - 1].position, this.proxyJoints[i].position).normalize();
@@ -267,13 +312,44 @@ export class IKChain {
         // iterate over the joints
         for (let i = this.proxyJoints.length - 2; i >= 0; i--) {
             // i+1th joint is the parent of the ith joint
-            let forward = new THREE.Vector3().subVectors(this.proxyJoints[i].position, this.proxyJoints[i + 1].position).normalize();
 
             // get pole object
             let pole = this.lookupPole(i + 1);
 
-            // get pole direction (if its already a vector, getPoleDirection returns the vector)
-            let poleDir = pole.getPoleDirection(this.proxyJoints[i + 1].position);
+            let poleDir = null;
+            // if no pole is defined, we will use a default pole
+            if (pole) {
+                // get pole direction (if its already a vector, getPoleDirection returns the vector)
+                poleDir = pole.getPoleDirectionVector(this.proxyJoints[i + 1].position);
+                // // bias the joint position towards the pole
+                // // compute a position for lerping
+                // let biasPos = this.proxyJoints[i + 1].position.clone().add(poleDir.clone());
+                // // lerp towards the pole direction
+                // this.proxyJoints[i + 1].position.lerp(biasPos, this.poleBiasStrength);
+
+                // const zLocal = new THREE.Vector3(0, 0, 1);
+                // const joint = this.proxyJoints[i + 1];
+                // const worldZ = zLocal.applyQuaternion(joint.quaternion).normalize();
+
+                // poleDir = worldZ.clone();
+
+                // // recalculate the pole direction since we moved the joint
+                // poleDir = pole.getPoleDirectionVector(this.proxyJoints[i + 1].position);
+            }
+            // if no pole defined, we will only disambiguate joint roll using the joint's local +Z axis
+            // unless some default parameters are given
+            // TODO: add support for default parameters
+            else {
+                // if no default pole is given, use the joint's local +Z axis as the pole direction
+                const zLocal = new THREE.Vector3(0, 0, 1);
+                const joint = this.proxyJoints[i + 1];
+                const worldZ = zLocal.applyQuaternion(joint.quaternion).normalize();
+
+                poleDir = worldZ.clone();
+            }
+
+            // calculate forward direction for the joint
+            let forward = new THREE.Vector3().subVectors(this.proxyJoints[i].position, this.proxyJoints[i + 1].position).normalize();
 
             // align joint's +Y with the forward direction
             let baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone());

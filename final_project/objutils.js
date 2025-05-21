@@ -6,7 +6,12 @@ import * as THREE from 'three';
 // with rotation and position
 export function createBox(options = {}) {
     let size = options.size || new THREE.Vector3(1, 1, 1);
+    const originShift = options.originShift || new THREE.Vector3(0, 0, 0);
+
     const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+
+    // shift the geometry to the center of the box
+    geometry.translate(-originShift.x, -originShift.y, -originShift.z);
 
     // material for the mesh
     const matColor = options.color || 0x00ff00;

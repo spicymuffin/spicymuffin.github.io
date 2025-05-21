@@ -24,10 +24,10 @@ initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
 const groundPlane = objutils.createGroundPlane(false);
-groundPlane.position.y = -2;
+groundPlane.position.y = -6;
 scene.add(groundPlane);
 const axis = new THREE.AxesHelper(10);
-axis.position.set(0, -2, 0);
+axis.position.set(0, 0, 0);
 axis.raycast = () => { };
 scene.add(axis);
 // const box = objutils.createBox();
@@ -39,14 +39,14 @@ const transformControls = new EditorControls(scene, camera, renderer.domElement,
 editorCameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
 const ntargets = 1;
-const IK_targets = [];
-IK_targets.length = ntargets;
+const targets = [];
+targets.length = ntargets;
 
 for (let i = 0; i < ntargets; i++) {
     const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
     target.name = `IK_target_${i}`;
-    target.position.set(0, 0, 6);
-    IK_targets[i] = target;
+    target.position.set(2, 3, 6);
+    targets[i] = target;
     scene.add(target);
 }
 
@@ -112,15 +112,40 @@ let constraints = [];
 //     }
 // ));
 
+// let poles = [];
+// const npoles = nbones;
+// poles.length = npoles;
 
+// for (let i = npoles - 1; i >= 0; i--) {
+//     const pole = objutils.createSphere({ radius: 0.3, color: 0xffff00, transparent: true, opacity: 0.5 });
+//     pole.name = `pole_${npoles - i - 1}`;
+//     pole.position.set(0, 3, i * 3 + 3);
+//     poles[npoles - i - 1] = new IKPole(pole, 0.2);
+//     scene.add(pole);
+// }
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, null, { debug: true, poleBiasStrength: 0.5, defaultPole: new IKPole(new THREE.Vector3(0, 1, 0), true) });
+let poles = [];
+const npoles = nbones;
+poles.length = npoles;
+
+const pole = objutils.createSphere({ radius: 0.3, color: 0xffff00, transparent: true, opacity: 0.5 });
+pole.name = `pole`;
+pole.position.set(0, 3, 3);
+const poleobj = new IKPole(pole, 0.2);
+
+for (let i = 0; i < npoles; i++) {
+    poles[i] = poleobj;
+}
+
+scene.add(pole);
+
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, poles, { debug: true, poleBiasStrength: 0.5, });
 
 let realtimeIK = false;
 
 const actions = {
     runSolver: () => {
-        testIKChain.solve(IK_targets[0], 0.1, 10);
+        testIKChain.solve(targets[0], 0.1, 10);
     },
 
     flipRealtimeIK: () => {
@@ -142,8 +167,16 @@ function render() {
     // render the scene
     renderer.render(scene, camera);
 
+    // update pole
+    const dir = new THREE.Vector3();
+    dir.subVectors(targets[0].position, bones[0].position);
+
+    pole.position.copy(bones[0].position.clone().add(dir.multiplyScalar(0.5)));
+    pole.position.y += 10;
+
+
     if (realtimeIK) {
-        testIKChain.solve(IK_targets[0], 0.1, 10);
+        testIKChain.solve(targets[0], 0.1, 50);
     }
 
     // GUI
