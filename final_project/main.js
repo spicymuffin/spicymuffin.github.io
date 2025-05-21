@@ -114,7 +114,7 @@ let constraints = [];
 
 
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, null, { debug: true });
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, null, { debug: true, poleBiasStrength: 0.5, defaultPole: new IKPole(new THREE.Vector3(0, 1, 0), true) });
 
 let realtimeIK = false;
 

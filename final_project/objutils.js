@@ -85,6 +85,31 @@ export function drawArrows(origin, xVec, yVec, zVec, shaftRadius = 0.02, headLen
     return group;
 }
 
+export function drawVector(origin, vec, color = 0x00ff00, shaftRadius = 0.02, headLengthRatio = 0.1, headWidthRatio = 2) {
+    const length = vec.length();
+    if (length === 0) return null;
+    const direction = vec.clone().normalize();
+    const arrow = new THREE.ArrowHelper(
+        direction,
+        origin.clone(),
+        length,
+        color,
+        length * headLengthRatio,
+        shaftRadius * headWidthRatio
+    );
+    const shaftGeom = new THREE.CylinderGeometry(shaftRadius, shaftRadius, length - length * headLengthRatio, 8);
+    const shaftMat = new THREE.MeshBasicMaterial({ color });
+    const shaft = new THREE.Mesh(shaftGeom, shaftMat);
+
+    shaft.position.copy(origin.clone().add(vec.clone().multiplyScalar(0.5 - headLengthRatio * 0.5)));
+    shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+
+    const group = new THREE.Group();
+    group.add(arrow);
+    group.add(shaft);
+    return group;
+}
+
 export function createDefaultCubeAndSphere() {
 
     // create a cube

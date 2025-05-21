@@ -24,59 +24,23 @@ export class IKConeConstraint extends IKJointConstraint {
     }
 }
 
+// implement constraints....
 export class IKAxisConstraint extends IKJointConstraint {
-    constructor(jointIndex, axis, opt = {}) {
+    constructor(jointIndex, axis, options = {}) {
         super(jointIndex);
         this.axis = axis.clone().normalize();
-        this.project = opt.project || false;
-        this.local = opt.local || false;
-        this.reference = opt.reference || null;
+
+        this.project = options.project || false;
+        this.local = options.local || false;
+        this.reference = options.reference || null;
     }
 
     apply(joints, i, boneObjs = null) {
-        if (!this.isActive || i !== this.jointIndex || i === 0) return;
 
-        const parent = joints[i - 1];
-        const curr = joints[i];
-        const len = parent.position.distanceTo(curr.position);
-
-        // ─── 1. Resolve world-space constraint axis ───
-        let axisW = this.axis.clone();
-        if (this.reference) {
-            axisW.applyQuaternion(this.reference.getWorldQuaternion(new THREE.Quaternion()));
-        } else if (this.local && boneObjs) {
-            axisW.applyQuaternion(boneObjs[i].getWorldQuaternion(new THREE.Quaternion()));
-        }
-        axisW.normalize();
-
-        // ─── 2. Project direction ───
-        const dir = curr.position.clone().sub(parent.position).normalize();
-
-        let newDir = this.project
-            ? dir.projectOnVector(axisW)
-            : dir.projectOnPlane(axisW);
-
-        if (newDir.lengthSq() === 0) return;  // degenerate projection
-        newDir.normalize();
-
-        // ─── 3. Update joint position to preserve bone length ───
-        curr.position.copy(parent.position).addScaledVector(newDir, len);
-
-        // ─── 4. Compute new quaternion (rotation frame) ───
-        // Forward = newDir (assume this is local +Y)
-        // Up = axisW (assume this is local +Z)
-        const forward = newDir;
-        const up = axisW.clone().sub(forward.clone().multiplyScalar(axisW.dot(forward))).normalize();
-        if (up.lengthSq() === 0) return; // parallel
-
-        const right = new THREE.Vector3().crossVectors(forward, up).normalize();
-        const correctedUp = new THREE.Vector3().crossVectors(right, forward).normalize();
-
-        const m = new THREE.Matrix4().makeBasis(right, forward, correctedUp);
-        curr.quaternion.setFromRotationMatrix(m);
     }
 }
 
+// only pass this world space vectors
 export class IKPole {
     constructor(pole, vector = true) {
         this.isVector = vector;
@@ -97,11 +61,17 @@ export class IKPole {
     }
 }
 
+function signedAngleBetween(a, b, normal) {
+    const angle = a.angleTo(b);
+    const cross = new THREE.Vector3().crossVectors(a, b);
+    return normal.dot(cross) > 0 ? angle : -angle;
+}
+
 export class IKChain {
     // creates proxy joints to solve with FABRIK without modifying the original joints' positions
     constructor(endEffectorBone, njoints, scene, constraints = null, poles = null, options = {}) {
         this.chainLength = njoints;
-        this.debug = false || options.debug;
+        this.debug = options.debug || false;
         if (this.debug) {
             this.jointVisualizers = [];
         }
@@ -110,7 +80,8 @@ export class IKChain {
         this.sceneRef = scene;
 
         // default pole is above the IK chain
-        this.defaultPole = options.defaultPole || new IKPole(new THREE.Vector3(0, 1, 0), true);
+        this.defaultPole = options.defaultPole || null;
+        this.poleBiasStrength = options.poleBiasStrength || 0.2;
 
         if (constraints) {
             this.constraints = constraints;
@@ -190,15 +161,17 @@ export class IKChain {
         if (this.poles[index]) {
             return this.poles[index];
         } else {
-            // if no pole is defined, use the default pole
-            // joint's local +Z
+            // if no pole is defined, use the default pole if its given as an option
+            if (this.defaultPole) {
+                return this.defaultPole;
+            }
+            // if no default pole is given, use the joint's local +Z axis as the pole direction
             const zLocal = new THREE.Vector3(0, 0, 1);
             const joint = this.proxyJoints[index];
 
             const worldZ = zLocal.applyQuaternion(joint.quaternion).normalize();
 
             return new IKPole(worldZ, true);  // directional pole
-            // return this.defaultPole;  // default pole
         }
     }
 
@@ -222,14 +195,21 @@ export class IKChain {
         for (let i = 1; i < this.proxyJoints.length; i++) {
             // i-1th joint is the child of the ith joint
 
-            // calculate forward direction for the joint
-            let forward = new THREE.Vector3().subVectors(this.proxyJoints[i - 1].position, this.proxyJoints[i].position).normalize();
-
             // get pole object
             let pole = this.lookupPole(i);
 
             // get pole direction (if its already a vector, getPoleDirection returns the vector)
-            let poleDir = pole.getPoleDirection(this.proxyJoints[i].position).clone();
+            let poleDir = pole.getPoleDirection(this.proxyJoints[i].position);
+
+            // bias the joint position towards the pole
+            // compute a position for lerping
+            let biasPos = this.proxyJoints[i].position.clone().add(poleDir.clone());
+
+            // lerp towards the pole direction
+            this.proxyJoints[i].position.lerp(biasPos, this.poleBiasStrength);
+
+            // calculate forward direction for the joint
+            let forward = new THREE.Vector3().subVectors(this.proxyJoints[i - 1].position, this.proxyJoints[i].position).normalize();
 
             // align joint's +Y with the forward direction
             let baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone());
@@ -244,31 +224,36 @@ export class IKChain {
             // project the current Z axis (after rotating by baseQuat) onto same plane
             let projectedCurrentZ = currentZWorld.clone().sub(forward.clone().multiplyScalar(currentZWorld.dot(forward))).normalize();
 
-            // compute the angle to rotate from current Z to target projected pole
-            let twistAngle = projectedCurrentZ.angleTo(projectedPole);
+            // compute the angle from projected Z to projected pole
+            const twistAngle = signedAngleBetween(projectedCurrentZ, projectedPole, forward);
 
-            // get the rotation direction (sign of twist)
-            let sign = Math.sign(forward.clone().dot(new THREE.Vector3().crossVectors(projectedCurrentZ, projectedPole)));
-            twistAngle *= sign;
-
-            // apply twist around the forward direction
+            // apply twist around the forward direction (note: forward points out of the screen)
             let twistQuat = new THREE.Quaternion().setFromAxisAngle(forward, twistAngle);
 
             // combine the base look rotation with the twist
-            let finalQuat = baseQuat.multiply(twistQuat);
+            let finalQuat = twistQuat.multiply(baseQuat);
 
             // set the joint's rotation to the final quaternion
             this.proxyJoints[i].quaternion.copy(finalQuat);
 
-            if (this.debug) {
-                // draw the basis
-                // const basis = objutils.drawArrows(this.proxyJoints[i].position, poleForwardOrtho, forward, poleRef);
-                // this.sceneRef.add(basis);
-            }
-
             // move the joint along the forward direction to compensate for the distance change
             let dist = this.jointDistances[i - 1];
+
             this.proxyJoints[i].position.copy(this.proxyJoints[i - 1].position.clone().add(forward.clone().multiplyScalar(-dist)));
+
+            if (this.debug) {
+                // // draw projected pole
+                // this.sceneRef.add(objutils.drawVector(this.proxyJoints[i].position, projectedPole, 0xffff00)); // yellow
+                // // draw the pole direction
+                // this.sceneRef.add(objutils.drawVector(this.proxyJoints[i].position, poleDir, 0x0000ff)); // blue
+                // // draw the forward direction
+                // this.sceneRef.add(objutils.drawVector(this.proxyJoints[i].position, forward, 0x00ffff)); // cyan
+                // // draw currentZworld
+                // this.sceneRef.add(objutils.drawVector(this.proxyJoints[i].position, currentZWorld, 0xff00ff)); // magenta
+                // // draw the projected currentZ
+                // this.sceneRef.add(objutils.drawVector(this.proxyJoints[i].position, projectedCurrentZ, 0x00ff00)); // green
+                // console.log(`joint ${i} twist angle: ${twistAngle * 180 / Math.PI}`);
+            }
 
             // apply constraints
             this.applyConstraints(i);
@@ -288,7 +273,7 @@ export class IKChain {
             let pole = this.lookupPole(i + 1);
 
             // get pole direction (if its already a vector, getPoleDirection returns the vector)
-            let poleDir = pole.getPoleDirection(this.proxyJoints[i + 1].position).clone();
+            let poleDir = pole.getPoleDirection(this.proxyJoints[i + 1].position);
 
             // align joint's +Y with the forward direction
             let baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone());
@@ -303,18 +288,14 @@ export class IKChain {
             // project the current Z axis (after rotating by baseQuat) onto same plane
             let projectedCurrentZ = currentZWorld.clone().sub(forward.clone().multiplyScalar(currentZWorld.dot(forward))).normalize();
 
-            // compute the angle to rotate from current Z to target projected pole
-            let twistAngle = projectedCurrentZ.angleTo(projectedPole);
+            // compute the angle from projected Z to projected pole
+            const twistAngle = signedAngleBetween(projectedCurrentZ, projectedPole, forward);
 
-            // get the rotation direction (sign of twist)
-            let sign = Math.sign(forward.clone().dot(new THREE.Vector3().crossVectors(projectedCurrentZ, projectedPole)));
-            twistAngle *= sign;
-
-            // apply twist around the forward direction
+            // apply twist around the forward direction (note: forward points out of the screen)
             let twistQuat = new THREE.Quaternion().setFromAxisAngle(forward, twistAngle);
 
             // combine the base look rotation with the twist
-            let finalQuat = baseQuat.multiply(twistQuat);
+            let finalQuat = twistQuat.multiply(baseQuat);
 
             // set the joint's rotation to the final quaternion
             this.proxyJoints[i + 1].quaternion.copy(finalQuat);
@@ -326,6 +307,7 @@ export class IKChain {
 
                 // console.log(`joint ${i} position: ${this.proxyJoints[i].position.x}, ${this.proxyJoints[i].position.y}, ${this.proxyJoints[i].position.z}`);
             }
+
             // move the joint along the forward direction to compensate for the distance change
             let dist = this.jointDistances[i];
             this.proxyJoints[i].position.copy(this.proxyJoints[i + 1].position.clone().add(forward.clone().multiplyScalar(dist)));
