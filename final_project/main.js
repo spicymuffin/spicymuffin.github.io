@@ -86,7 +86,7 @@ const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, {
 constraints[0] = new IKPoleConstraint(1, testIKChain, pole);
 constraints[1] = new IKPoleConstraint(2, testIKChain, pole);
 
-let realtimeIK = false;
+let realtimeIK = true;
 
 const actions = {
     runSolver: () => {

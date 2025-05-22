@@ -228,7 +228,7 @@ export class IKChain {
             let targetQuat = target.getWorldQuaternion(new THREE.Quaternion());
             this.doForwardPass(targetPos, targetQuat);
             this.doBackwardPass(this.rootPos);
-            this.applyConstraints();
+            // this.applyConstraints();
 
             // check if the end effector is within tolerance of the target
             // let dist = this.proxyJoints[0].position.distanceTo(targetPos);
@@ -281,7 +281,7 @@ export class IKChain {
             }
 
             // apply constraints
-            // this.applyConstraints(i);
+            this.applyConstraints(i);
         }
     }
 
@@ -315,7 +315,7 @@ export class IKChain {
             this.proxyJoints[i].position.copy(this.proxyJoints[i + 1].position.clone().add(forward.clone().multiplyScalar(dist)));
 
             // apply constraints
-            // this.applyConstraints(i);
+            this.applyConstraints(i);
         }
 
     }
