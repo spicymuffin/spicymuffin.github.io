@@ -45,7 +45,7 @@ targets.length = ntargets;
 for (let i = 0; i < ntargets; i++) {
     const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
     target.name = `IK_target_${i}`;
-    target.position.set(2, 3, 6);
+    target.position.set(0, 3, 6);
     targets[i] = target;
     scene.add(target);
 }
@@ -131,15 +131,17 @@ poles.length = npoles;
 const pole = objutils.createSphere({ radius: 0.3, color: 0xffff00, transparent: true, opacity: 0.5 });
 pole.name = `pole`;
 pole.position.set(0, 3, 3);
-const poleobj = new IKPole(pole, 0.2);
+const poleobj = new IKPole(pole, -0.2, Math.PI);
 
 for (let i = 0; i < npoles; i++) {
     poles[i] = poleobj;
 }
 
+poles[3] = new IKPole(pole, 0.0, Math.PI);
+
 scene.add(pole);
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, poles, { debug: true, poleBiasStrength: 0.5, });
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, poles, { debug: true  });
 
 let realtimeIK = false;
 
@@ -169,10 +171,10 @@ function render() {
 
     // update pole
     const dir = new THREE.Vector3();
-    dir.subVectors(targets[0].position, bones[0].position);
+    dir.subVectors(bones[0].position, targets[0].position);
 
-    pole.position.copy(bones[0].position.clone().add(dir.multiplyScalar(0.5)));
-    pole.position.y += 10;
+    pole.position.copy(targets[0].position.clone().add(dir.multiplyScalar(0.75)));
+    pole.position.y -= 1;
 
 
     if (realtimeIK) {

@@ -44,9 +44,10 @@ export class IKAxisConstraint extends IKJointConstraint {
 // also the polePosition is a reference, so updating the polePosition will update the IKPole
 // by default, the pole also defines the rotation of the joint too. the joint will align its +Z axis to the pole direction
 export class IKPole {
-    constructor(poleObject, strength = 0.1) {
+    constructor(poleObject, strength = 0.1, angle = 0) {
         this.poleObject = poleObject;
         this.strength = strength;
+        this.angle = angle;
     }
 
     // return anonymous pole direction
@@ -270,7 +271,10 @@ export class IKChain {
             let projectedCurrentZ = currentZWorld.clone().sub(forward.clone().multiplyScalar(currentZWorld.dot(forward))).normalize();
 
             // compute the angle from projected Z to projected pole
-            const twistAngle = signedAngleBetween(projectedCurrentZ, projectedPole, forward);
+            let twistAngle = signedAngleBetween(projectedCurrentZ, projectedPole, forward);
+
+            // the pole angle is used to adjust the twist
+            twistAngle += pole.angle;
 
             // apply twist around the forward direction (note: forward points out of the screen)
             let twistQuat = new THREE.Quaternion().setFromAxisAngle(forward, twistAngle);
@@ -319,13 +323,13 @@ export class IKChain {
             let poleDir = null;
             // if no pole is defined, we will use a default pole
             if (pole) {
-                // get pole direction (if its already a vector, getPoleDirection returns the vector)
-                poleDir = pole.getPoleDirectionVector(this.proxyJoints[i + 1].position);
+                // // get pole direction (if its already a vector, getPoleDirection returns the vector)
+                // poleDir = pole.getPoleDirectionVector(this.proxyJoints[i + 1].position);
                 // // bias the joint position towards the pole
                 // // compute a position for lerping
                 // let biasPos = this.proxyJoints[i + 1].position.clone().add(poleDir.clone());
                 // // lerp towards the pole direction
-                // this.proxyJoints[i + 1].position.lerp(biasPos, this.poleBiasStrength);
+                // this.proxyJoints[i + 1].position.lerp(biasPos, pole.strength);
 
                 // const zLocal = new THREE.Vector3(0, 0, 1);
                 // const joint = this.proxyJoints[i + 1];
@@ -333,8 +337,8 @@ export class IKChain {
 
                 // poleDir = worldZ.clone();
 
-                // // recalculate the pole direction since we moved the joint
-                // poleDir = pole.getPoleDirectionVector(this.proxyJoints[i + 1].position);
+                // recalculate the pole direction since we moved the joint
+                poleDir = pole.getPoleDirectionVector(this.proxyJoints[i + 1].position);
             }
             // if no pole defined, we will only disambiguate joint roll using the joint's local +Z axis
             // unless some default parameters are given
@@ -365,7 +369,10 @@ export class IKChain {
             let projectedCurrentZ = currentZWorld.clone().sub(forward.clone().multiplyScalar(currentZWorld.dot(forward))).normalize();
 
             // compute the angle from projected Z to projected pole
-            const twistAngle = signedAngleBetween(projectedCurrentZ, projectedPole, forward);
+            let twistAngle = signedAngleBetween(projectedCurrentZ, projectedPole, forward);
+
+            // the pole angle is used to adjust the twist
+            twistAngle += pole.angle;
 
             // apply twist around the forward direction (note: forward points out of the screen)
             let twistQuat = new THREE.Quaternion().setFromAxisAngle(forward, twistAngle);
