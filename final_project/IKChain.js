@@ -80,6 +80,7 @@ export class IKPoleConstraint extends IKJointConstraint {
 
         joint.sub(root).applyQuaternion(q).add(root);
 
+        // !!! this part needs to be handled by axis constraints
         // // twist up (+Z) towards the projected pole direction
         // const curUp = new THREE.Vector3(0, 0, 1).applyQuaternion(this.chain.proxyJoints[this.jointIndex].quaternion);
 
