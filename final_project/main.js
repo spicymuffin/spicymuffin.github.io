@@ -78,15 +78,13 @@ pole.position.set(0, 5, 3);
 scene.add(pole);
 
 constraints = [
-    null, null, null, null
+    null, null,
 ];
 
 const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true });
 
-constraints[0] = new IKPoleConstraint(1, testIKChain, pole);
-constraints[1] = new IKPoleConstraint(2, testIKChain, pole);
-constraints[2] = new IKAxisConstraint(1, testIKChain, new THREE.Vector3(1, 0, 0), 0, 0, {debug: false});
-constraints[3] = new IKAxisConstraint(2, testIKChain, new THREE.Vector3(1, 0, 0), 0, 0, {debug: false});
+constraints[0] = new IKPoleConstraint(1, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: true });
+constraints[1] = new IKPoleConstraint(2, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: true });
 
 let realtimeIK = false;
 
