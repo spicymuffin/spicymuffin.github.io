@@ -13,32 +13,30 @@ export class IKJointConstraint {
         this.joint_index = joint_index;
         this.active = true;
     }
-    apply(/* joints, i, boneObjs */) {
+
+    apply() {
         throw new Error('apply() must be implemented by subclass');
     }
 }
 
+// implement constraints??
 export class IKConeConstraint extends IKJointConstraint {
     // joint is the joint to be constrained
     // checker is a function that checks if the joint is within the constraint
     constructor(joint_index, chain, joint, options = {}) {
-        super(joint_index)
+        super(joint_index, chain)
     }
 
     apply() {
     }
 }
 
-// implement constraints....
 export class IKAxisConstraint extends IKJointConstraint {
     constructor(joint_index, chain, axis, options = {}) {
         super(joint_index, chain);
-        this.axis = axis.clone().normalize();
-
     }
 
     apply() {
-
     }
 }
 
@@ -80,12 +78,12 @@ export class IKPoleConstraint extends IKJointConstraint {
 
         joint_pos.sub(root_pos).applyQuaternion(q).add(root_pos);
 
-        // // !!! this part needs to be handled by axis constraints
-        // // twist up (+Z) towards the projected pole direction
-        // const curUp = new THREE.Vector3(0, 0, 1).applyQuaternion(this.chain.bone_proxies[this.joint_index].quaternion);
+        // !!! this part needs to be handled by axis constraints
+        // twist up (+Z) towards the projected pole direction
+        const curUp = new THREE.Vector3(0, 0, 1).applyQuaternion(this.chain.bone_proxies[this.joint_index].quaternion);
 
-        // // draw the current up vector
-        // this.chain.scene_ref.add(objutils.drawVector(joint_pos, curUp.clone().multiplyScalar(3), 0xff00ff)); // magenta
+        // draw the current up vector
+        this.chain.scene_ref.add(objutils.drawVector(joint_pos, curUp.clone().multiplyScalar(3), 0xff00ff)); // magenta
     }
 }
 
@@ -203,17 +201,31 @@ export class IKChain {
             let targetQuat = target.getWorldQuaternion(new THREE.Quaternion());
             this.doForwardPass(targetPos, targetQuat);
             this.doBackwardPass(this.root_pos);
-            // this.applyConstraints();
+            this.applyConstraints();
+            this.alignBones();
 
             // check if the end effector is within tolerance of the target
-            // let dist = this.bone_proxies[0].position.distanceTo(targetPos);
-            // if (dist < tolerance) {
-            //     // if the end effector is within tolerance, we are done
-            //     if (this.debug) {
-            //         console.log(`FABRIK converged in ${i + 1} iterations`);
-            //     }
-            //     return;
-            // }
+            let dist = this.bone_proxies[0].position.distanceTo(targetPos);
+            if (dist < tolerance) {
+                // if the end effector is within tolerance, we are done
+                if (this.debug) {
+                    console.log(`FABRIK converged in ${i + 1} iterations`);
+                }
+                return;
+            }
+        }
+    }
+
+    alignBones() {
+        // iterate through all the bone proxies, align +Y of the parent to point towards the child
+        for (let i = 1; i < this.bone_proxies.length; i++) {
+            let forward = new THREE.Vector3().subVectors(this.bone_proxies[i - 1].position, this.bone_proxies[i].position).normalize();
+
+            // align joint's +Y with the forward direction
+            let baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone());
+
+            // set the bone's rotation to the final quaternion
+            this.bone_proxies[i].quaternion.copy(baseQuat);
         }
     }
 
@@ -225,73 +237,35 @@ export class IKChain {
 
         // iterate over the joints
         for (let i = 1; i < this.bone_proxies.length; i++) {
-            // i-1th joint is the child of the ith joint
+            // i-1th bone is the child of the ith bone
 
-            // calculate forward direction for the joint
+            // calculate forward direction for the bone
             let forward = new THREE.Vector3().subVectors(this.bone_proxies[i - 1].position, this.bone_proxies[i].position).normalize();
 
-            // align joint's +Y with the forward direction
-            let baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone());
-
-            // set the joint's rotation to the final quaternion
-            this.bone_proxies[i].quaternion.copy(baseQuat);
-
-            // move the joint along the forward direction to compensate for the distance change
+            // move the bone along the forward direction to compensate for the distance change
             let dist = this.bone_lengths[i - 1];
 
             this.bone_proxies[i].position.copy(this.bone_proxies[i - 1].position.clone().add(forward.clone().multiplyScalar(-dist)));
-
-            if (this.debug) {
-                // // draw projected pole
-                // this.scene_ref.add(objutils.drawVector(this.bone_proxies[i].position, projectedPole, 0xffff00)); // yellow
-                // // draw the pole direction
-                // this.scene_ref.add(objutils.drawVector(this.bone_proxies[i].position, poleDir, 0x0000ff)); // blue
-                // // draw the forward direction
-                // this.scene_ref.add(objutils.drawVector(this.bone_proxies[i].position, forward, 0x00ffff)); // cyan
-                // // draw currentZworld
-                // this.scene_ref.add(objutils.drawVector(this.bone_proxies[i].position, currentZWorld, 0xff00ff)); // magenta
-                // // draw the projected currentZ
-                // this.scene_ref.add(objutils.drawVector(this.bone_proxies[i].position, projectedCurrentZ, 0x00ff00)); // green
-                // console.log(`joint ${i} twist angle: ${twistAngle * 180 / Math.PI}`);
-            }
         }
 
         // apply constraints
-        this.applyConstraints();
+        // this.applyConstraints();
     }
 
     doBackwardPass(root_pos) {
         this.bone_proxies[this.bone_proxies.length - 1].position.copy(root_pos);
-        // we dont need to set the rotation of the root joint, since that will be handled by constraints
+        // we dont need to set the rotation of the root bone, since that will be handled by constraints
 
-        // iterate over the joints
+        // iterate over the bones
         for (let i = this.bone_proxies.length - 2; i >= 0; i--) {
-            // i+1th joint is the parent of the ith joint
+            // i+1th bone is the parent of the ith bone
 
-            // calculate forward direction for the joint
+            // calculate forward direction for the bone
             let forward = new THREE.Vector3().subVectors(this.bone_proxies[i].position, this.bone_proxies[i + 1].position).normalize();
 
-            // align joint's +Y with the forward direction
-            let baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone());
-
-            // set the joint's rotation to the final quaternion
-            this.bone_proxies[i + 1].quaternion.copy(baseQuat);
-
-            if (this.debug) {
-                // // draw the basis
-                // const basis = objutils.drawArrows(this.bone_proxies[i].position, poleForwardOrtho, forward, poleRef);
-                // this.scene_ref.add(basis);
-
-                // console.log(`joint ${i} position: ${this.bone_proxies[i].position.x}, ${this.bone_proxies[i].position.y}, ${this.bone_proxies[i].position.z}`);
-            }
-
-            // move the joint along the forward direction to compensate for the distance change
+            // move the bone along the forward direction to compensate for the distance change
             let dist = this.bone_lengths[i];
             this.bone_proxies[i].position.copy(this.bone_proxies[i + 1].position.clone().add(forward.clone().multiplyScalar(dist)));
-
         }
-
-        // apply constraints
-        this.applyConstraints();
     }
 }
