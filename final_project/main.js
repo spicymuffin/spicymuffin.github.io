@@ -7,7 +7,7 @@ import * as objutils from './objutils.js';
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
-import { IKChain, IKJointConstraint, IKAxisConstraint, IKPoleConstraint } from './IKChain.js';
+import { IKChain, IKJointConstraint, IKAxisConstraint } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 const gui = new GUI();
@@ -36,17 +36,11 @@ const transformControls = new EditorControls(scene, camera, renderer.domElement,
 
 editorCameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
-const ntargets = 1;
-const targets = [];
-targets.length = ntargets;
+const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
+target.name = `target`;
+target.position.set(0, 3, 6);
+scene.add(target);
 
-for (let i = 0; i < ntargets; i++) {
-    const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
-    target.name = `IK_target_${i}`;
-    target.position.set(0, 3, 6);
-    targets[i] = target;
-    scene.add(target);
-}
 
 const nbones = 4;
 const bones = [];
@@ -68,10 +62,6 @@ scene.add(bones[0]);
 
 let constraints = [];
 
-let poles = [];
-const npoles = nbones;
-poles.length = npoles;
-
 const pole = objutils.createSphere({ radius: 0.3, color: 0xffff00, transparent: true, opacity: 0.5 });
 pole.name = `pole`;
 pole.position.set(0, 5, 3);
@@ -79,33 +69,13 @@ scene.add(pole);
 
 constraints = {}
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true });
-
-
-constraints[1] = [new IKPoleConstraint(1, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: false })];
-constraints[2] = [new IKPoleConstraint(2, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: false })];
-constraints[3] = [new IKPoleConstraint(3, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: false, move: false })];
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true, pole: pole });
 
 let realtimeIK = false;
 
-// const sphere1 = objutils.createSphere({ radius: 0.2, color: 0x00ff00, transparent: true, opacity: 0.5 });
-// sphere1.name = 'sphere1';
-// sphere1.position.set(0, 0, 0);
-// scene.add(sphere1);
-
-// const axis1 = new THREE.AxesHelper(0.6);
-// axis1.raycast = () => { };
-// sphere1.add(axis1);
-
-// const targetrot = objutils.createBox({ width: 0.2, height: 0.2, depth: 0.2, color: 0x0000ff, transparent: true, opacity: 0.5 });
-// targetrot.name = 'targetrot';
-// targetrot.position.set(3, 4, 5);
-// scene.add(targetrot);
-
-
 const actions = {
     runSolver: () => {
-        testIKChain.solve(targets[0], 0.01, 10);
+        testIKChain.solve(target, 0.01, 10);
     },
 
     flipRealtimeIK: () => {
@@ -113,29 +83,23 @@ const actions = {
     },
 
     action: () => {
-        point_sphere1_to_targetrot();
+
     }
 };
-
-function point_sphere1_to_targetrot() {
-    const norot_axes = ['x', 'z']
-    // Desired direction from sphere to target
-    const targetDir = new THREE.Vector3().subVectors(targetrot.position, sphere1.position).normalize();
-
-    // Quaternion that rotates +Y to point at the target direction
-    const rotQuat = new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0), // local up
-        targetDir // world direction to target
-    );
-
-    sphere1.quaternion.copy(rotQuat);
-}
 
 // add a button
 gui.add(actions, 'runSolver').name('Solve IK');
 gui.add(actions, 'flipRealtimeIK').name('Realtime IK');
 gui.add(actions, 'action').name('Action');
 
+
+// spider locomomotion workflow:
+// 1. user gives some inputs (wasd)
+// 2. the spider position is updated (spider's body and target raycasters)
+//    this causes all the targets to move with the spider
+//    if some legs' anchors are too far from their targets, a repositioning sequence lerps anchors to targets
+// 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
+// 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
 function render() {
     requestAnimationFrame(render);
     const delta = clock.getDelta();
@@ -148,13 +112,13 @@ function render() {
 
     // update pole
     const dir = new THREE.Vector3();
-    dir.subVectors(bones[0].position, targets[0].position);
+    dir.subVectors(bones[0].position, target.position);
 
-    pole.position.copy(targets[0].position.clone().add(dir.multiplyScalar(0.5)));
+    pole.position.copy(target.position.clone().add(dir.multiplyScalar(0.5)));
     pole.position.y += 5;
 
     if (realtimeIK) {
-        testIKChain.solve(targets[0], 0.1, 10);
+        testIKChain.solve(target, 0.01, 10);
     }
 
     // GUI
