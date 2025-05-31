@@ -7,7 +7,7 @@ import * as objutils from './objutils.js';
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
-import { IKChain, IKJointConstraint, IKAxisConstraint, IKPoleConstraint } from './IKChain.js';
+import { IKChain, IKJointConstraint, IKAxisConstraint } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 const gui = new GUI();
@@ -36,17 +36,11 @@ const transformControls = new EditorControls(scene, camera, renderer.domElement,
 
 editorCameraControls.lookAt(new THREE.Vector3(0, 0, 0));
 
-const ntargets = 1;
-const targets = [];
-targets.length = ntargets;
+const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
+target.name = `target`;
+target.position.set(0, 3, 6);
+scene.add(target);
 
-for (let i = 0; i < ntargets; i++) {
-    const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
-    target.name = `IK_target_${i}`;
-    target.position.set(0, 3, 6);
-    targets[i] = target;
-    scene.add(target);
-}
 
 const nbones = 4;
 const bones = [];
@@ -68,40 +62,44 @@ scene.add(bones[0]);
 
 let constraints = [];
 
-let poles = [];
-const npoles = nbones;
-poles.length = npoles;
-
 const pole = objutils.createSphere({ radius: 0.3, color: 0xffff00, transparent: true, opacity: 0.5 });
 pole.name = `pole`;
 pole.position.set(0, 5, 3);
 scene.add(pole);
 
-constraints = [
-    null, null
-];
+constraints = {}
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true });
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true, pole: pole });
 
-constraints[0] = new IKPoleConstraint(1, testIKChain, pole);
-constraints[1] = new IKPoleConstraint(2, testIKChain, pole);
-
-let realtimeIK = true;
+let realtimeIK = false;
 
 const actions = {
     runSolver: () => {
-        testIKChain.solve(targets[0], 0.1, 1);
+        testIKChain.solve(target, 0.01, 10);
     },
 
     flipRealtimeIK: () => {
         realtimeIK = !realtimeIK;
     },
+
+    action: () => {
+
+    }
 };
 
 // add a button
 gui.add(actions, 'runSolver').name('Solve IK');
 gui.add(actions, 'flipRealtimeIK').name('Realtime IK');
+gui.add(actions, 'action').name('Action');
 
+
+// spider locomomotion workflow:
+// 1. user gives some inputs (wasd)
+// 2. the spider position is updated (spider's body and target raycasters)
+//    this causes all the targets to move with the spider
+//    if some legs' anchors are too far from their targets, a repositioning sequence lerps anchors to targets
+// 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
+// 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
 function render() {
     requestAnimationFrame(render);
     const delta = clock.getDelta();
@@ -114,14 +112,13 @@ function render() {
 
     // update pole
     const dir = new THREE.Vector3();
-    dir.subVectors(bones[0].position, targets[0].position);
+    dir.subVectors(bones[0].position, target.position);
 
-    pole.position.copy(targets[0].position.clone().add(dir.multiplyScalar(0.5)));
+    pole.position.copy(target.position.clone().add(dir.multiplyScalar(0.5)));
     pole.position.y += 5;
 
-
     if (realtimeIK) {
-        testIKChain.solve(targets[0], 0.1, 50);
+        testIKChain.solve(target, 0.01, 10);
     }
 
     // GUI

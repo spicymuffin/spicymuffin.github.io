@@ -1,0 +1,7 @@
+fork() 시 페이지 공유 전략: 부모–자식 모두 PTE_W 비트 삭제, PTE_COW(커스텀 플래그) 추가, 공유 프레임 카운트 refcnt++.
+
+쓰기 page fault 흐름: rcr2()로 fault VA 획득 → walkpgdir()로 PTE 확인 → PTE_COW이면 새 프레임 kalloc() → memmove() → PTE 업데이트 → refcnt-- 및 필요시 kfree(). 과제 명세에 제시된 카운트 조건과 일치하도록 검증 로직 추가. 
+
+munmap() + dirty 페이지 쓰기 백: COW 이후 dirty flag(커스텀) 확인 → filewrite()로 디스크 반영.
+
+테스트 벤치: fork() → 부모·자식 동시 쓰기 → diff로 독립성 확인하는 cowtest.c 예시 공유
