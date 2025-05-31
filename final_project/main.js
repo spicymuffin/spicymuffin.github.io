@@ -77,16 +77,31 @@ pole.name = `pole`;
 pole.position.set(0, 5, 3);
 scene.add(pole);
 
-constraints = [
-    null, null,
-];
+constraints = {}
 
 const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true });
 
-constraints[0] = new IKPoleConstraint(1, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: true });
-constraints[1] = new IKPoleConstraint(2, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: true });
+
+constraints[1] = [new IKPoleConstraint(1, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: false })];
+constraints[2] = [new IKPoleConstraint(2, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: false })];
+constraints[3] = [new IKPoleConstraint(3, testIKChain, pole, { polerot_root: -2, polerot_leaf: -2, debug: false, move: false })];
 
 let realtimeIK = false;
+
+// const sphere1 = objutils.createSphere({ radius: 0.2, color: 0x00ff00, transparent: true, opacity: 0.5 });
+// sphere1.name = 'sphere1';
+// sphere1.position.set(0, 0, 0);
+// scene.add(sphere1);
+
+// const axis1 = new THREE.AxesHelper(0.6);
+// axis1.raycast = () => { };
+// sphere1.add(axis1);
+
+// const targetrot = objutils.createBox({ width: 0.2, height: 0.2, depth: 0.2, color: 0x0000ff, transparent: true, opacity: 0.5 });
+// targetrot.name = 'targetrot';
+// targetrot.position.set(3, 4, 5);
+// scene.add(targetrot);
+
 
 const actions = {
     runSolver: () => {
@@ -96,11 +111,30 @@ const actions = {
     flipRealtimeIK: () => {
         realtimeIK = !realtimeIK;
     },
+
+    action: () => {
+        point_sphere1_to_targetrot();
+    }
 };
+
+function point_sphere1_to_targetrot() {
+    const norot_axes = ['x', 'z']
+    // Desired direction from sphere to target
+    const targetDir = new THREE.Vector3().subVectors(targetrot.position, sphere1.position).normalize();
+
+    // Quaternion that rotates +Y to point at the target direction
+    const rotQuat = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0), // local up
+        targetDir // world direction to target
+    );
+
+    sphere1.quaternion.copy(rotQuat);
+}
 
 // add a button
 gui.add(actions, 'runSolver').name('Solve IK');
 gui.add(actions, 'flipRealtimeIK').name('Realtime IK');
+gui.add(actions, 'action').name('Action');
 
 function render() {
     requestAnimationFrame(render);
@@ -118,7 +152,6 @@ function render() {
 
     pole.position.copy(targets[0].position.clone().add(dir.multiplyScalar(0.5)));
     pole.position.y += 5;
-
 
     if (realtimeIK) {
         testIKChain.solve(targets[0], 0.1, 10);
