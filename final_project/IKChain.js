@@ -2,52 +2,7 @@ import * as THREE from 'three';
 
 import * as colors from './colors.js';
 import * as objutils from './objutils.js';
-
-function signedAngleBetween(a, b, normal) {
-    const angle = a.angleTo(b);
-    const cross = new THREE.Vector3().crossVectors(a, b);
-    return normal.dot(cross) > 0 ? angle : -angle;
-}
-
-function translateQuaternion(ancestor, descendant) {
-    let translated_quaternion = new THREE.Quaternion()
-
-    const q_world_ancestor = new THREE.Quaternion();
-    ancestor.getWorldQuaternion(q_world_ancestor);
-    const q_world_descendant = new THREE.Quaternion();
-    descendant.getWorldQuaternion(q_world_descendant);
-
-    const q_world_ancestor_inverse = q_world_ancestor.clone().invert();
-    translated_quaternion.multiplyQuaternions(q_world_ancestor_inverse, q_world_descendant);
-
-    return translated_quaternion;
-}
-
-function translateVector(v, ancestor, descendant) {
-    let translted_vector = new THREE.Vector3()
-    const m_local_to_world = descendant.matrixWorld;
-    const m_world_to_parent = ancestor.matrixWorld.clone().invert();
-
-    const m_local_to_parent = new THREE.Matrix4();
-    m_local_to_parent.multiplyMatrices(m_world_to_parent, m_local_to_world);
-    translted_vector.copy(v).transformDirection(m_local_to_parent);
-    return translted_vector;
-}
-
-function basisToQuaternion(x, y, z) {
-    let targetQuaternion = new THREE.Quaternion()
-    const matrix = new THREE.Matrix4();
-    matrix.makeBasis(x, y, z);
-    targetQuaternion.setFromRotationMatrix(matrix);
-    return targetQuaternion;
-}
-
-function getAlignmentQuaternion(q_from, q_to) {
-    let q = new THREE.Quaternion()
-    const q_inverse = q_from.clone().invert();
-    q.multiplyQuaternions(q_to, q_inverse);
-    return q;
-}
+import * as transformutils from './transformutils.js';
 
 export class IKChain {
     // creates proxy joints to solve with FABRIK without modifying the original joints' positions
@@ -117,9 +72,6 @@ export class IKChain {
 
         // set the root joint to be the last joint in the chain
         this.root_pos = new THREE.Vector3().copy(this.bone_proxies[this.bone_proxies.length - 1].position);
-        if (options.root_pos) {
-            this.root_pos.copy(options.root_pos);
-        }
 
         // calculate the distance between the joints
         this.bone_lengths = [];
@@ -128,7 +80,7 @@ export class IKChain {
             this.bone_lengths.push(dist);
         }
 
-        this.anchor_bone_ref_plus_x = translateVector(
+        this.anchor_bone_ref_plus_x = transformutils.translateVector(
             new THREE.Vector3(1, 0, 0), // +X vector
             this.space_ref,
             this.anchor_bone_ref
@@ -153,7 +105,7 @@ export class IKChain {
 
         if (this.debug) {
             for (let i = 0; i < this.bone_proxies.length; i++) {
-                console.log(`adding proxy joint ${i} to space_ref`);
+                // console.log(`adding proxy joint ${i} to space_ref`);
                 const sphere = objutils.createSphere({ radius: 0.2, color: 0xff00ff });
                 sphere.quaternion.copy(this.bone_proxies[i].quaternion);
                 sphere.name = `proxy_${i}`;
@@ -282,11 +234,31 @@ export class IKChain {
             // project the joint position onto the plane defined by the chain direction
             const projected_joint_dir = joint_dir.clone().projectOnPlane(chain_vec);
 
-            const align_angle = signedAngleBetween(projected_joint_dir, projected_pole_dir, chain_vec);
+            const align_angle = transformutils.signedAngleBetween(projected_joint_dir, projected_pole_dir, chain_vec);
 
             const q = new THREE.Quaternion().setFromAxisAngle(chain_vec, align_angle);
 
             joint_pos.sub(root_pos).applyQuaternion(q).add(root_pos);
+        }
+    }
+
+    extendBonesTowardsPole() {
+        const anchor_pole = new THREE.Vector3().subVectors(this.pole.position, this.root_pos).normalize();
+
+        // anchor is already extended towards the pole
+        for (let i = this.chain_len - 2; i >= 0; i--) {
+            const parent_proxy_position = this.bone_proxies[i + 1].position;
+            const length_of_current_segment = this.bone_lengths[i];
+
+            const new_child_position = new THREE.Vector3();
+            new_child_position.copy(parent_proxy_position);
+            new_child_position.addScaledVector(anchor_pole, length_of_current_segment);
+
+            this.bone_proxies[i].position.copy(new_child_position);
+
+            if (this.debug) {
+                // console.log(`Extended bone ${this.bone_proxies[i].name} (index ${i}) towards pole direction. Parent: ${this.bone_proxies[i + 1].name}`);
+            };
         }
     }
 
@@ -295,6 +267,10 @@ export class IKChain {
     solve(target, tolerance = 0.01, max_iterations = 50) {
         let target_pos = target.position.clone();
         let target_quat = target.quaternion.clone();
+
+        this.extendBonesTowardsPole();
+
+        // return;
 
         for (let i = 0; i < max_iterations; i++) {
             this.doForwardPass(target_pos, target_quat);
