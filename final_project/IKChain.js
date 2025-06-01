@@ -237,7 +237,6 @@ export class IKChain {
 
         // these go from world space to the space_ref's local space
         const spaceInvM = this.space_ref.matrixWorld.clone().invert();
-        const spaceInvQ = this.space_ref.getWorldQuaternion(new THREE.Quaternion()).invert();
 
         let iterator = bone_end;
         for (let i = 0; i < chain_len; i++) {
@@ -248,11 +247,7 @@ export class IKChain {
 
             // calculates only the position of the OBJECT, not of all its points
             const wp = iterator.getWorldPosition(new THREE.Vector3());
-            proxy.position.copy(wp).applyMatrix4(spaceInvM); // p_space = pS⁻¹ · p_world
-
-            // set the rotation of the OBJECT
-            const wq = iterator.getWorldQuaternion(new THREE.Quaternion());
-            proxy.quaternion.copy(spaceInvQ).multiply(wq); // q_space = qS⁻¹ * q_world
+            proxy.position.copy(wp).applyMatrix4(spaceInvM);
 
             this.bone_proxies.push(proxy); // add the proxy to the bone proxies
             this.space_ref.add(proxy); // parent proxies to the space_ref
@@ -275,6 +270,8 @@ export class IKChain {
             const dist = this.bone_proxies[i].position.distanceTo(this.bone_proxies[i + 1].position);
             this.bone_lengths.push(dist);
         }
+
+        console.log(`bone lengths: ${this.bone_lengths}`);
 
         if (this.debug) {
             for (let i = 0; i < this.bone_proxies.length; i++) {

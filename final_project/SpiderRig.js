@@ -3,6 +3,8 @@ import * as objutils from './objutils.js';
 import * as boneutils from './boneutils.js';
 import * as colors from './colors.js';
 
+import * as IK from './IKChain.js';
+
 function degToRad(degrees) {
     return degrees * (Math.PI / 180);
 }
@@ -13,7 +15,7 @@ export class SpiderRig {
     constructor(parent_ref, options = {}) {
         this.parent_ref = parent_ref;
 
-        this.debug = options.debug || true;
+        this.debug = options.debug ?? true;
 
         // create the rig
         // no ascii art, consult an image that hopefully someone has drawn...
@@ -27,6 +29,7 @@ export class SpiderRig {
         // create the center - anchor bones
         this.limb_count = options.limb_count || 8; // default to 8 limbs?
 
+        // lengths of the levels, from level 0 to level 3
         this.level_lengths = options.level_lengths || [0.5, 1.5, 1, 0.75];
 
         // angles from front to back from fwd to limb
@@ -143,7 +146,7 @@ export class SpiderRig {
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
                 const target = objutils.createSphere({
-                    radius: 0.1,
+                    radius: 0.25,
                     color: colors.red,
                     opacity: 0.5,
                 });
@@ -186,6 +189,61 @@ export class SpiderRig {
 
                 this.parent_ref.add(pole);
                 this.poles[lr].push(pole);
+            }
+        }
+
+        // initialize IK chains
+        this.ik_chains = [[], []];
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const chain = new IK.IKChain(
+                    this.bone_levels[this.bone_levels.length - 1][lr][i],
+                    this.bone_levels.length - 1, // level 0 should be static,
+                    parent_ref, // space reference
+                    {}, // constraints
+                    {
+                        pole: this.poles[lr][i],
+                        debug: true
+                    } // options
+                );
+
+                chain.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_chain`;
+                this.ik_chains[lr].push(chain);
+            }
+        }
+    }
+
+    // pass target and pole in parent_ref space!
+    updateIKChain(lr, i, target_pos = null, pole_pos = null) {
+        if (target_pos) {
+            this.targets[lr][i].position.copy(target_pos);
+        }
+
+        if (pole_pos) {
+            this.poles[lr][i].position.copy(pole_pos);
+        }
+
+        console.log(`updating IK chain for ${i}th ${lr ? 'right' : 'left'} limb`);
+
+        // update the IK chain
+        this.ik_chains[lr][i].solve(
+            this.targets[lr][i], // target obj
+            0.01, // tolerance
+            15 // max iterations
+        )
+    }
+
+    // pass target_positions and pose_positions in parent_ref space!
+    updateIKChains(target_positions = null, pose_positions = null) {
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                if (target_positions && target_positions[lr] && target_positions[lr][i]) {
+                    this.targets[lr][i].position.copy(target_positions[lr][i]);
+                }
+                if (pose_positions && pose_positions[lr] && pose_positions[lr][i]) {
+                    this.poles[lr][i].position.copy(pose_positions[lr][i]);
+                }
+                this.updateIKChain(lr, i);
             }
         }
     }
