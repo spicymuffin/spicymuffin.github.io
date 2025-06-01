@@ -181,6 +181,7 @@ export class IKChain {
         }
     }
 
+    // this doesnt really work with FABRIK
     preRotateInitialGuess(target_pos_in_space_ref) {
         // calculate the normal of the plane defined by the root, end effector and target
         const anchor_target = new THREE.Vector3().subVectors(target_pos_in_space_ref, this.root_pos);
@@ -200,7 +201,6 @@ export class IKChain {
             this.bone_proxies[i].position.copy(rotated);
         }
     }
-
 
     // apply constaints for ith joint
     applyConstraints(i, mode) {
@@ -262,13 +262,39 @@ export class IKChain {
         }
     }
 
+    // this doesnt really work that well with FABRIK too, a bit better than preRotateInitialGuess
+    // am i a retard?
+    rotateBonesTowardsPole() {
+        for (let i = 1; i < this.bone_proxies.length - 1; i++) {
+            // rotate the bone around chainDirection towards polePosition
+            const pole_pos = this.pole.position;
+            const joint_pos = this.bone_proxies[i].position;
+            const root_pos = this.bone_proxies[this.chain_len - 1].position;
+            const leaf_pos = this.bone_proxies[0].position;
+
+            const chain_vec = new THREE.Vector3().subVectors(leaf_pos, root_pos).normalize();
+
+            const pole_dir = new THREE.Vector3().subVectors(pole_pos, root_pos).normalize();
+            const joint_dir = new THREE.Vector3().subVectors(joint_pos, root_pos).normalize();
+
+            // project the pole position onto the plane defined by the chain direction
+            const projected_pole_dir = pole_dir.clone().projectOnPlane(chain_vec);
+            // project the joint position onto the plane defined by the chain direction
+            const projected_joint_dir = joint_dir.clone().projectOnPlane(chain_vec);
+
+            const align_angle = signedAngleBetween(projected_joint_dir, projected_pole_dir, chain_vec);
+
+            const q = new THREE.Quaternion().setFromAxisAngle(chain_vec, align_angle);
+
+            joint_pos.sub(root_pos).applyQuaternion(q).add(root_pos);
+        }
+    }
+
     // solves using FABRIK
     // target is a position, in a space that is in space_ref
     solve(target, tolerance = 0.01, max_iterations = 50) {
         let target_pos = target.position.clone();
         let target_quat = target.quaternion.clone();
-
-        this.preRotateInitialGuess(target_pos);
 
         for (let i = 0; i < max_iterations; i++) {
             this.doForwardPass(target_pos, target_quat);
