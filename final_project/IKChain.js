@@ -108,6 +108,7 @@ export class IKAxisConstraint extends IKJointConstraint {
 
 //         joint_pos.sub(root_pos).applyQuaternion(q).add(root_pos);
 
+//         // THESE CREATE VECTOR CALLS ARE MALFORMED, use the new signature!
 //         // // draw vectors for debugging
 //         // if (this.debug) {
 //         //     this.chain_ref.space_ref.add(objutils.drawVector(
@@ -236,7 +237,6 @@ export class IKChain {
 
         // these go from world space to the space_ref's local space
         const spaceInvM = this.space_ref.matrixWorld.clone().invert();
-        const spaceInvQ = this.space_ref.getWorldQuaternion(new THREE.Quaternion()).invert();
 
         let iterator = bone_end;
         for (let i = 0; i < chain_len; i++) {
@@ -247,11 +247,7 @@ export class IKChain {
 
             // calculates only the position of the OBJECT, not of all its points
             const wp = iterator.getWorldPosition(new THREE.Vector3());
-            proxy.position.copy(wp).applyMatrix4(spaceInvM); // p_space = pS⁻¹ · p_world
-
-            // set the rotation of the OBJECT
-            const wq = iterator.getWorldQuaternion(new THREE.Quaternion());
-            proxy.quaternion.copy(spaceInvQ).multiply(wq); // q_space = qS⁻¹ * q_world
+            proxy.position.copy(wp).applyMatrix4(spaceInvM);
 
             this.bone_proxies.push(proxy); // add the proxy to the bone proxies
             this.space_ref.add(proxy); // parent proxies to the space_ref
@@ -274,6 +270,8 @@ export class IKChain {
             const dist = this.bone_proxies[i].position.distanceTo(this.bone_proxies[i + 1].position);
             this.bone_lengths.push(dist);
         }
+
+        console.log(`bone lengths: ${this.bone_lengths}`);
 
         if (this.debug) {
             for (let i = 0; i < this.bone_proxies.length; i++) {
@@ -323,15 +321,6 @@ export class IKChain {
         }
     }
 
-    // index is the index of the joint to be biased towards the pole
-    lookupPole(index) {
-        if (this.poles[index]) {
-            return this.poles[index];
-        } else {
-            return null;
-        }
-    }
-
     calculateChainDirection() {
         // calculate the direction of the chain from root to tip
         const root_pos = this.bone_proxies[this.chain_len - 1].position;
@@ -365,10 +354,10 @@ export class IKChain {
             if (up.lengthSq() < 1e-8) continue;
 
             // TODO: rewrite with pure quaternions for stability (performance??)
-            const left = new THREE.Vector3().crossVectors(forward, up).normalize();
+            const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
             const m = new THREE.Matrix4();
-            m.makeBasis(left, forward, up); // +X, +Y, +Z
+            m.makeBasis(right, forward, up); // +X, +Y, +Z
             const q = new THREE.Quaternion().setFromRotationMatrix(m);
 
             joint.quaternion.copy(q);

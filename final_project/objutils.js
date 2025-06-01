@@ -36,11 +36,15 @@ export function createSphere(options = {}) {
     const radius = options.radius || 1;
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
-    const matColor = options.color || 0x00ff00;
+    const opacity = options.opacity || 1.0;
+
+    const is_transparent = opacity < 1.0;
+
+    const mat_color = options.color || 0x00ff00;
     const material = new THREE.MeshLambertMaterial({
-        color: matColor,
-        transparent: options.transparent || false,
-        opacity: options.opacity !== undefined ? options.opacity : 1.0
+        color: mat_color,
+        transparent: is_transparent,
+        opacity: opacity
     });
 
     const sphere = new THREE.Mesh(geometry, material);
@@ -54,8 +58,18 @@ export function createSphere(options = {}) {
     return sphere;
 }
 
-export function drawArrows(origin, xVec, yVec, zVec, shaftRadius = 0.02, headLengthRatio = 0.1, headWidthRatio = 2) {
+// just use THREE.AxisHelper btw, dont use this, this sucks
+export function createArrows(options = {}) {
     const group = new THREE.Group();
+
+    const origin = options.origin || new THREE.Vector3(0, 0, 0);
+    const xvec = options.xVec || new THREE.Vector3(1, 0, 0);
+    const yvec = options.yVec || new THREE.Vector3(0, 1, 0);
+    const zvec = options.zVec || new THREE.Vector3(0, 0, 1);
+
+    const shaft_radius = options.shaftRadius || 0.02;
+    const head_length_ratio = options.head_length_ratio || 0.1;
+    const head_width_ratio = options.head_width_ratio || 2;
 
     function createArrow(dirVec, color) {
         const length = dirVec.length();
@@ -67,15 +81,15 @@ export function drawArrows(origin, xVec, yVec, zVec, shaftRadius = 0.02, headLen
             origin.clone(),
             length,
             color,
-            length * headLengthRatio,
-            shaftRadius * headWidthRatio
+            length * head_length_ratio,
+            shaft_radius * head_width_ratio
         );
 
-        const shaftGeom = new THREE.CylinderGeometry(shaftRadius, shaftRadius, length - length * headLengthRatio, 8);
-        const shaftMat = new THREE.MeshBasicMaterial({ color });
-        const shaft = new THREE.Mesh(shaftGeom, shaftMat);
+        const shaft_geo = new THREE.CylinderGeometry(shaft_radius, shaft_radius, length - length * head_length_ratio, 8);
+        const shaft_mat = new THREE.MeshBasicMaterial({ color });
+        const shaft = new THREE.Mesh(shaft_geo, shaft_mat);
 
-        shaft.position.copy(origin.clone().add(dirVec.clone().multiplyScalar(0.5 - headLengthRatio * 0.5)));
+        shaft.position.copy(origin.clone().add(dirVec.clone().multiplyScalar(0.5 - head_length_ratio * 0.5)));
         shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
 
         group.add(arrow);
@@ -83,14 +97,23 @@ export function drawArrows(origin, xVec, yVec, zVec, shaftRadius = 0.02, headLen
         return arrow;
     }
 
-    createArrow(xVec, 0xff0000); // x is red
-    createArrow(yVec, 0x00ff00); // y is green
-    createArrow(zVec, 0x0000ff); // z is blue
+    createArrow(xvec, 0xff0000); // x is red
+    createArrow(yvec, 0x00ff00); // y is green
+    createArrow(zvec, 0x0000ff); // z is blue
 
     return group;
 }
 
-export function drawVector(origin, vec, color = 0x00ff00, shaftRadius = 0.02, headLengthRatio = 0.1, headWidthRatio = 2) {
+
+export function createVector(options = {}) {
+
+    const origin = options.origin || new THREE.Vector3(0, 0, 0);
+    const vec = options.vec || new THREE.Vector3(1, 0, 0);
+    const color = options.color || 0x00ff00; // green
+    const shaft_radius = options.shaft_radius || 0.02;
+    const head_length_ratio = options.head_length_ratio || 0.1;
+    const head_width_ratio = options.head_width_ratio || 2;
+
     const length = vec.length();
     if (length === 0) return null;
     const direction = vec.clone().normalize();
@@ -99,14 +122,14 @@ export function drawVector(origin, vec, color = 0x00ff00, shaftRadius = 0.02, he
         origin.clone(),
         length,
         color,
-        length * headLengthRatio,
-        shaftRadius * headWidthRatio
+        length * head_length_ratio,
+        shaft_radius * head_width_ratio
     );
-    const shaftGeom = new THREE.CylinderGeometry(shaftRadius, shaftRadius, length - length * headLengthRatio, 8);
-    const shaftMat = new THREE.MeshBasicMaterial({ color });
-    const shaft = new THREE.Mesh(shaftGeom, shaftMat);
+    const shaft_geo = new THREE.CylinderGeometry(shaft_radius, shaft_radius, length - length * head_length_ratio, 8);
+    const shaft_mat = new THREE.MeshBasicMaterial({ color });
+    const shaft = new THREE.Mesh(shaft_geo, shaft_mat);
 
-    shaft.position.copy(origin.clone().add(vec.clone().multiplyScalar(0.5 - headLengthRatio * 0.5)));
+    shaft.position.copy(origin.clone().add(vec.clone().multiplyScalar(0.5 - head_length_ratio * 0.5)));
     shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
 
     const group = new THREE.Group();
@@ -115,73 +138,12 @@ export function drawVector(origin, vec, color = 0x00ff00, shaftRadius = 0.02, he
     return group;
 }
 
-export function createDefaultCubeAndSphere() {
-
-    // create a cube
-    const cubeGeometry = new THREE.BoxGeometry(4, 4, 4);
-    const cubeMaterial = new THREE.MeshLambertMaterial({
-        color: 0xff0000
-    });
-    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.castShadow = true;
-
-    // position the cube
-    cube.position.x = -4;
-    cube.position.y = 3;
-    cube.position.z = 0;
-
-    const sphereGeometry = new THREE.SphereGeometry(4, 20, 20);
-    const sphereMaterial = new THREE.MeshLambertMaterial({
-        color: 0x7777ff
-    });
-    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-
-    // position the sphere
-    sphere.position.x = 20;
-    sphere.position.y = 0;
-    sphere.position.z = 2;
-    sphere.castShadow = true;
-
-    return {
-        cube: cube,
-        sphere: sphere
-    };
-}
-
 export function createGroundPlane() {
     // create the ground plane
     const planeGeometry = new THREE.PlaneGeometry(50, 50, 120, 120);
     const planeMaterial = new THREE.MeshPhongMaterial({
         color: 0xffffff
     });
-    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-    plane.receiveShadow = true;
-
-    // rotate and position the plane
-    plane.rotation.x = -0.5 * Math.PI;
-    plane.position.x = 0;
-    plane.position.y = 0;
-    plane.position.z = 0;
-
-    return plane;
-}
-
-export function createLargeGroundPlane(useTexture) {
-
-    const withTexture = (useTexture !== undefined) ? useTexture : false;
-
-    // create the ground plane
-    const planeGeometry = new THREE.PlaneGeometry(10000, 10000);
-    const planeMaterial = new THREE.MeshPhongMaterial({
-        color: 0xffffff
-    });
-    if (withTexture) {
-        const textureLoader = new THREE.TextureLoader();
-        planeMaterial.map = textureLoader.load("./assets/textures/floor-wood.jpg");
-        planeMaterial.map.wrapS = THREE.RepeatWrapping;
-        planeMaterial.map.wrapT = THREE.RepeatWrapping;
-        planeMaterial.map.repeat.set(80, 80)
-    }
     const plane = new THREE.Mesh(planeGeometry, planeMaterial);
     plane.receiveShadow = true;
 

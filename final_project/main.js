@@ -3,12 +3,15 @@ import * as THREE from 'three';
 import { initStats, initRenderer, initCamera, initDefaultLighting, initDefaultDirectionalLighting } from './setup.js';
 
 import * as objutils from './objutils.js';
+import * as colors from './colors.js';
 
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
 import { IKChain, IKJointConstraint, IKAxisConstraint } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+import { SpiderRig } from './SpiderRig.js';
 
 const gui = new GUI();
 gui.domElement.style.position = 'absolute';
@@ -23,7 +26,7 @@ const clock = new THREE.Clock();
 initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
-const groundPlane = objutils.createGroundPlane(false);
+const groundPlane = objutils.createGroundPlane();
 groundPlane.position.y = -6;
 scene.add(groundPlane);
 const axis = new THREE.AxesHelper(10);
@@ -73,6 +76,28 @@ const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, {
 
 let realtimeIK = false;
 
+// spider locomomotion workflow:
+// 1. user gives some inputs (wasd)
+// 2. the spider position is updated (spider's body and target raycasters)
+//    this causes all the targets to move with the spider
+//    if some legs' anchors are too far from their targets, a repositioning sequence lerps anchors to targets
+// 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
+// 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
+
+const spider_root = objutils.createSphere({
+    radius: 0.5,
+    color: colors.white,
+    transparent: true,
+    opacity: 0.5,
+});
+spider_root.name = 'spider_root';
+scene.add(spider_root);
+
+const spider_rig = new SpiderRig(spider_root, {
+    position: new THREE.Vector3(0, -3, 0),
+    debug: true,
+});
+
 const actions = {
     runSolver: () => {
         testIKChain.solve(target, 0.01, 10);
@@ -83,7 +108,7 @@ const actions = {
     },
 
     action: () => {
-
+        spider_rig.updateIKChains();
     }
 };
 
@@ -92,14 +117,6 @@ gui.add(actions, 'runSolver').name('Solve IK');
 gui.add(actions, 'flipRealtimeIK').name('Realtime IK');
 gui.add(actions, 'action').name('Action');
 
-
-// spider locomomotion workflow:
-// 1. user gives some inputs (wasd)
-// 2. the spider position is updated (spider's body and target raycasters)
-//    this causes all the targets to move with the spider
-//    if some legs' anchors are too far from their targets, a repositioning sequence lerps anchors to targets
-// 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
-// 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
 function render() {
     requestAnimationFrame(render);
     const delta = clock.getDelta();
@@ -120,6 +137,8 @@ function render() {
     if (realtimeIK) {
         testIKChain.solve(target, 0.01, 10);
     }
+
+    spider_rig.updateIKChains();
 
     // GUI
     stats.update();
