@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as objutils from './objutils.js';
 import * as boneutils from './boneutils.js';
 import * as colors from './colors.js';
+import * as transformutils from './transformutils.js';
 
 import * as IK from './IKChain.js';
 
@@ -30,7 +31,7 @@ export class SpiderRig {
         this.limb_count = options.limb_count || 8; // default to 8 limbs?
 
         // lengths of the levels, from level 0 to level 3
-        this.level_lengths = options.level_lengths || [0.5, 1.5, 1, 0.75];
+        this.level_lengths = options.level_lengths || [1, 1.5, 1, 0.75];
 
         // angles from front to back from fwd to limb
         this.oy_angles = options.angles || [Math.PI / 9 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
@@ -41,6 +42,8 @@ export class SpiderRig {
         // 0 - left, 1 - right
         // 0 - front, n - back
         this.bone_levels = Array.from({ length: 5 }, () => [[], []]);
+
+        this.ik_anchors = [[], []];
 
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
@@ -59,6 +62,9 @@ export class SpiderRig {
                 const up = new THREE.Vector3(0, 1, 0);
                 const fwd = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta)); // angles are front to back, so we use -cos
                 const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+
+                // store the static pole anchor position for this limb in parent space
+                this.ik_anchors[lr][i] = fwd.clone().multiplyScalar(this.level_lengths[0]);
 
                 // set the rotation
                 const m = new THREE.Matrix4();
@@ -199,7 +205,7 @@ export class SpiderRig {
                 const chain = new IK.IKChain(
                     this.bone_levels[this.bone_levels.length - 1][lr][i],
                     this.bone_levels.length - 1, // level 0 should be static,
-                    parent_ref, // space reference
+                    this.parent_ref, // space reference
                     {}, // constraints
                     {
                         pole: this.poles[lr][i],
@@ -223,7 +229,7 @@ export class SpiderRig {
             this.poles[lr][i].position.copy(pole_pos);
         }
 
-        console.log(`updating IK chain for ${i}th ${lr ? 'right' : 'left'} limb`);
+        // console.log(`updating IK chain for ${i}th ${lr ? 'right' : 'left'} limb`);
 
         // update the IK chain
         this.ik_chains[lr][i].solve(
@@ -244,6 +250,65 @@ export class SpiderRig {
                     this.poles[lr][i].position.copy(pose_positions[lr][i]);
                 }
                 this.updateIKChain(lr, i);
+            }
+        }
+    }
+
+    updatePolePositions(options = {}) {
+        // if pole positions are provided, use them
+        if (options.pole_positions) {
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    if (options.pole_positions[lr] && options.pole_positions[lr][i]) {
+                        this.poles[lr][i].position.copy(options.pole_positions[lr][i]);
+                    }
+                    else {
+                        throw new Error(`pole position for ${i}th ${lr ? 'right' : 'left'} limb not provided`);
+                    }
+                }
+            }
+        }
+        // if pole positions are not provided, calculate halfway between root and target positions, add osme constant to y
+        else {
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    const target_pos = this.targets[lr][i].position.clone();
+                    // TODO: this code is so bad, needs refactoring/optimization
+                    const anchor_pos = this.ik_anchors[lr][i];
+                    const center_pos = this.bone_levels[0][0][0].position.clone();
+
+                    const center_anchor = new THREE.Vector3().subVectors(anchor_pos, center_pos).projectOnPlane(new THREE.Vector3(0, 1, 0));
+                    const anchor_target = new THREE.Vector3().subVectors(target_pos, anchor_pos).projectOnPlane(new THREE.Vector3(0, 1, 0));
+                    const center_target = new THREE.Vector3().subVectors(target_pos, center_pos).projectOnPlane(new THREE.Vector3(0, 1, 0));
+
+                    // if (i == 0 && lr == 1) {
+                    //     console.log(center_anchor.dot(anchor_target))
+                    //     this.parent_ref.add(objutils.createVector({
+                    //         origin: center_pos,
+                    //         vec: center_anchor,
+                    //         color: colors.red,
+                    //     }));
+                    //     this.parent_ref.add(objutils.createVector({
+                    //         origin: anchor_pos,
+                    //         vec: anchor_target,
+                    //         color: colors.blue,
+                    //     }));
+                    // }
+
+                    if (center_anchor.dot(anchor_target) < 0) {
+                        // if the anchor and target are on opposite sides, we need to flip the pole position
+                        anchor_target.multiplyScalar(-1);
+                    }
+
+                    anchor_target.normalize();
+                    center_anchor.normalize();
+                    center_target.normalize();
+
+                    const pole_pos = new THREE.Vector3().copy(center_pos).add(center_target.multiplyScalar(5));
+                    pole_pos.y += target_pos.y + 5;
+
+                    this.poles[lr][i].position.copy(pole_pos);
+                }
             }
         }
     }
