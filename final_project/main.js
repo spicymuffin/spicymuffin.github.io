@@ -8,7 +8,7 @@ import * as colors from './colors.js';
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
-import { IKChain, IKJointConstraint, IKAxisConstraint } from './IKChain.js';
+import { IKChain } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 import { SpiderRig } from './SpiderRig.js';
@@ -138,7 +138,10 @@ function render() {
         testIKChain.solve(target, 0.01, 10);
     }
 
-    spider_rig.updateIKChains();
+    // update the poles
+    // spider_rig.updatePolePositions();
+    // update the IK chains
+    // spider_rig.updateIKChains();
 
     // GUI
     stats.update();

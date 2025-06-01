@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import * as colors from './colors.js';
 import * as objutils from './objutils.js';
 
 function signedAngleBetween(a, b, normal) {
@@ -8,196 +9,49 @@ function signedAngleBetween(a, b, normal) {
     return normal.dot(cross) > 0 ? angle : -angle;
 }
 
-export class IKJointConstraint {
-    constructor(joint_index, chain_ref) {
-        this.joint_index = joint_index;
-        this.active = true;
-    }
+function translateQuaternion(ancestor, descendant) {
+    let translated_quaternion = new THREE.Quaternion()
 
-    apply_pos() {
-        throw new Error('apply_pos() must be implemented by subclass');
-    }
+    const q_world_ancestor = new THREE.Quaternion();
+    ancestor.getWorldQuaternion(q_world_ancestor);
+    const q_world_descendant = new THREE.Quaternion();
+    descendant.getWorldQuaternion(q_world_descendant);
 
-    apply_rot() {
-        throw new Error('apply_rot() must be implemented by subclass');
-    }
+    const q_world_ancestor_inverse = q_world_ancestor.clone().invert();
+    translated_quaternion.multiplyQuaternions(q_world_ancestor_inverse, q_world_descendant);
+
+    return translated_quaternion;
 }
 
-// implement constraints??
-export class IKConeConstraint extends IKJointConstraint {
-    // joint is the joint to be constrained
-    // checker is a function that checks if the joint is within the constraint
-    constructor(joint_index, chain_ref, joint, options = {}) {
-        super(joint_index, chain_ref)
-    }
+function translateVector(v, ancestor, descendant) {
+    let translted_vector = new THREE.Vector3()
+    const m_local_to_world = descendant.matrixWorld;
+    const m_world_to_parent = ancestor.matrixWorld.clone().invert();
 
-    apply_pos() {
-    }
-    apply_rot() {
-    }
+    const m_local_to_parent = new THREE.Matrix4();
+    m_local_to_parent.multiplyMatrices(m_world_to_parent, m_local_to_world);
+    translted_vector.copy(v).transformDirection(m_local_to_parent);
+    return translted_vector;
 }
 
-export class IKAxisConstraint extends IKJointConstraint {
-    constructor(joint_index, chain_ref, axis, options = {}) {
-        super(joint_index, chain_ref);
-    }
-
-    apply_pos() {
-    }
-    apply_rot() {
-    }
+function basisToQuaternion(x, y, z) {
+    let targetQuaternion = new THREE.Quaternion()
+    const matrix = new THREE.Matrix4();
+    matrix.makeBasis(x, y, z);
+    targetQuaternion.setFromRotationMatrix(matrix);
+    return targetQuaternion;
 }
 
-// piece of shit IK pole constraint idea i am literal idiot never look into this code
-// // only pass this world space locations
-// // also the polePosition is a reference, so updating the polePosition will update the IKPole
-// // by default, the pole also defines the rotation of the joint too. the joint will align its +Z axis to the pole direction
-// export class IKPoleConstraint extends IKJointConstraint {
-//     constructor(joint_index, chain_ref, pole_ref, options = {}) {
-//         super(joint_index, chain_ref);
-//         this.joint_index = joint_index;
-//         this.chain_ref = chain_ref;
-//         this.pole_ref = pole_ref;
-
-//         this.rotate = options.rotate ?? true; // if true, the joint will not be rotated, only moved
-//         this.move = options.move ?? true; // if true, the joint will not be moved, only rotated
-
-//         this.debug = options.debug || false;
-//         this.angle = options.angle || 0; // angle to align the joint with the pole direction
-//         this.polerot_root = options.polerot_root || -1; // index of the root joint for pole rotation
-//         this.polerot_leaf = options.polerot_leaf || -1; // index of the leaf joint for pole rotation
-
-//         if (this.polerot_root == -1) {
-//             this.polerot_root = this.joint_index + 1;
-//         }
-//         else if (this.polerot_root == -2) {
-//             this.polerot_root = this.chain_ref.bone_proxies.length - 1
-//         }
-//         if (this.polerot_leaf == -1) {
-//             this.polerot_leaf = this.joint_index - 1;
-//         }
-//         else if (this.polerot_leaf == -2) {
-//             this.polerot_leaf = 0;
-//         }
-//     }
-
-//     apply_pos() {
-//         if (!this.move) return; // if move is false, do not apply position
-//         // rotate the joint around chainDirection towards polePosition
-//         const pole_pos = this.pole_ref.position.clone();
-//         const joint_pos = this.chain_ref.bone_proxies[this.joint_index].position;
-//         const root_pos = this.chain_ref.bone_proxies[this.polerot_root].position;
-//         const leaf_pos = this.chain_ref.bone_proxies[this.polerot_leaf].position;
-
-//         const chain_vec = new THREE.Vector3().subVectors(leaf_pos, root_pos).normalize();
-
-//         const pole_dir = new THREE.Vector3().subVectors(pole_pos, root_pos).normalize();
-//         const joint_dir = new THREE.Vector3().subVectors(joint_pos, root_pos).normalize();
-
-//         // project the pole position onto the plane defined by the chain direction
-//         const projected_pole_dir = pole_dir.clone().projectOnPlane(chain_vec);
-//         // project the joint position onto the plane defined by the chain direction
-//         const projected_joint_dir = joint_dir.clone().projectOnPlane(chain_vec);
-
-
-//         // calculate the angle between the joint direction and the pole direction, offset by this pole's align angle
-//         const align_angle = signedAngleBetween(projected_joint_dir, projected_pole_dir, chain_vec) + this.angle;
-
-//         // rotate the joint around chainVec by the angle
-//         const q = new THREE.Quaternion().setFromAxisAngle(chain_vec, align_angle);
-
-//         joint_pos.sub(root_pos).applyQuaternion(q).add(root_pos);
-
-//         // THESE CREATE VECTOR CALLS ARE MALFORMED, use the new signature!
-//         // // draw vectors for debugging
-//         // if (this.debug) {
-//         //     this.chain_ref.space_ref.add(objutils.drawVector(
-//         //         root_pos,
-//         //         chain_vec.clone().multiplyScalar(2),
-//         //         0xff0000, // red for chain direction
-//         //         0.02, 0.1, 2
-//         //     ));
-
-//         //     this.chain_ref.space_ref.add(objutils.drawVector(
-//         //         root_pos,
-//         //         projected_pole_dir.clone().multiplyScalar(2),
-//         //         0x00ff00, // green for pole direction
-//         //         0.02, 0.1, 2
-//         //     ));
-
-//         //     this.chain_ref.space_ref.add(objutils.drawVector(
-//         //         root_pos,
-//         //         projected_joint_dir.clone().multiplyScalar(2),
-//         //         0x0000ff, // blue for joint direction
-//         //         0.02, 0.1, 2
-//         //     ));
-//         // }
-//     }
-
-//     apply_rot() {
-//         if (!this.rotate) return; // if rotate is false, do not apply rotation
-
-//         const pole_pos = this.pole_ref.position.clone();
-//         const root_pos = this.chain_ref.bone_proxies[this.polerot_root].position;
-//         const child_pos = this.chain_ref.bone_proxies[this.joint_index - 1].position;
-
-//         const forward = new THREE.Vector3().subVectors(child_pos, this.chain_ref.bone_proxies[this.joint_index].position).normalize();
-
-//         const pole_dir = new THREE.Vector3().subVectors(pole_pos, root_pos).normalize();
-
-//         // project the pole position onto the plane defined by the chain direction
-//         const projected_pole_dir = pole_dir.clone().projectOnPlane(forward).normalize();
-
-//         // calculate the current up vector of the joint
-//         const cur_up = new THREE.Vector3(0, 0, 1).applyQuaternion(this.chain_ref.bone_proxies[this.joint_index].quaternion);
-
-//         // project the current up vector onto the plane defined by the chain direction
-//         const cur_up_projected = cur_up.clone().projectOnPlane(forward).normalize();
-
-//         if (cur_up_projected.lengthSq() < 1e-9) return;
-
-//         // signed twist angle around chain_vec
-//         const twist_angle = signedAngleBetween(cur_up_projected, projected_pole_dir, forward);
-
-//         const twist_quat = new THREE.Quaternion().setFromAxisAngle(forward, twist_angle);
-//         this.chain_ref.bone_proxies[this.joint_index].quaternion.premultiply(twist_quat);
-
-//         if (this.debug) {
-//             // draw the current up vector
-//             this.chain_ref.space_ref.add(objutils.drawVector(
-//                 this.chain_ref.bone_proxies[this.joint_index].position,
-//                 cur_up.multiplyScalar(2),
-//                 0xffffff
-//             )); // white
-
-//             // draw the projected pole
-//             this.chain_ref.space_ref.add(objutils.drawVector(
-//                 this.chain_ref.bone_proxies[this.joint_index].position,
-//                 projected_pole_dir,
-//                 0xffff00
-//             )); // yellow
-//             // draw the current up vector
-//             this.chain_ref.space_ref.add(objutils.drawVector(
-//                 this.chain_ref.bone_proxies[this.joint_index].position,
-//                 cur_up_projected,
-//                 0xff00ff
-//             )); // magenta
-
-//             // draw chain_vec
-//             this.chain_ref.space_ref.add(objutils.drawVector(
-//                 root_pos,
-//                 forward.multiplyScalar([this.chain_ref.bone_lengths[this.joint_index - 1]]),
-//                 0x00ffff
-//             )); // cyan
-//             console.log(`twist angle: ${twist_quat * 180 / Math.PI}`);
-//             console.log(`angle cur_up_projected-projected_pole_dir: ${forward.angleTo(projected_pole_dir) * 180 / Math.PI}`);
-//         }
-//     }
-// }
+function getAlignmentQuaternion(q_from, q_to) {
+    let q = new THREE.Quaternion()
+    const q_inverse = q_from.clone().invert();
+    q.multiplyQuaternions(q_to, q_inverse);
+    return q;
+}
 
 export class IKChain {
     // creates proxy joints to solve with FABRIK without modifying the original joints' positions
-    constructor(bone_end, chain_len, space_ref, constraints = {}, options = {}) {
+    constructor(end_effector_bone_ref, chain_len, space_ref, constraints = {}, options = {}) {
         this.chain_len = chain_len;
         this.debug = options.debug || false;
         if (this.debug) {
@@ -206,7 +60,7 @@ export class IKChain {
 
         this.pole = options.pole || null; // pole position, if any
 
-        this.bone_end = bone_end;
+        this.end_effector_bone_ref = end_effector_bone_ref;
         this.space_ref = space_ref;
 
         this.constraints = constraints; // constraints for the chain, indexed by joint index
@@ -214,7 +68,7 @@ export class IKChain {
         if (chain_len < 2) {
             throw new Error('chain length must be at least 2');
         }
-        if (!bone_end) {
+        if (!end_effector_bone_ref) {
             throw new Error('end effector must be non null');
         }
 
@@ -235,15 +89,15 @@ export class IKChain {
         // however, we need to recompute the chain's world matrices so:
         this.space_ref.updateWorldMatrix(false, true);
 
-        // these go from world space to the space_ref's local space
+        // this goes from world space to the space_ref's local space
         const spaceInvM = this.space_ref.matrixWorld.clone().invert();
 
-        let iterator = bone_end;
+        let iterator = this.end_effector_bone_ref;
         for (let i = 0; i < chain_len; i++) {
             const proxy = new THREE.Object3D();
             proxy.name = `proxy_${i}`;
 
-            // wp for world position, wq for world quaternion
+            // wp for world position
 
             // calculates only the position of the OBJECT, not of all its points
             const wp = iterator.getWorldPosition(new THREE.Vector3());
@@ -251,17 +105,20 @@ export class IKChain {
 
             this.bone_proxies.push(proxy); // add the proxy to the bone proxies
             this.space_ref.add(proxy); // parent proxies to the space_ref
-            iterator = iterator.parent; // go up the hierarchy to the parent joint
-
+            if (i + 1 != chain_len) {
+                iterator = iterator.parent; // go up the hierarchy to the parent joint IF we are not at the root already
+            }
             if (this.debug) {
                 console.log(`added proxy joint ${i} for ${iterator.name}`);
             }
         }
 
+        this.anchor_bone_ref = iterator; // the last joint in the chain is the anchor bone
+
         // set the root joint to be the last joint in the chain
         this.root_pos = new THREE.Vector3().copy(this.bone_proxies[this.bone_proxies.length - 1].position);
-        if (options.rootPos) {
-            this.root_pos.copy(options.rootPos);
+        if (options.root_pos) {
+            this.root_pos.copy(options.root_pos);
         }
 
         // calculate the distance between the joints
@@ -271,7 +128,27 @@ export class IKChain {
             this.bone_lengths.push(dist);
         }
 
-        console.log(`bone lengths: ${this.bone_lengths}`);
+        this.anchor_bone_ref_space_ref_quat = translateQuaternion(
+            this.space_ref,
+            this.anchor_bone_ref
+        ); // anchor bone's quaternion in the space_ref's local space
+
+        // offset of every joint from root in rest pose
+        this.rest_offsets = [];
+        for (let i = 0; i < this.chain_len - 1; ++i) {
+            // root-relative offset copied now so it never changes
+            const off = this.bone_proxies[i].position.clone().sub(this.root_pos);
+            this.rest_offsets.push(off);
+            if (this.debug) {
+                const vector = objutils.createVector({
+                    origin: this.root_pos,
+                    vec: off.clone(),
+                    color: colors.green,
+                    shaft_radius: 0.01,
+                });
+                this.space_ref.add(vector);
+            }
+        }
 
         if (this.debug) {
             for (let i = 0; i < this.bone_proxies.length; i++) {
@@ -301,8 +178,12 @@ export class IKChain {
                 }
             }
         }
+    }
+
+    preRotateInitialGuess(target_pos_in_space_ref) {
 
     }
+
 
     // apply constaints for ith joint
     applyConstraints(i, mode) {
@@ -333,9 +214,9 @@ export class IKChain {
         const root_pos = this.bone_proxies[this.chain_len - 1].position;
         const endeffector_pos = this.bone_proxies[0].position;
 
-        const chainDir = new THREE.Vector3().subVectors(endeffector_pos, root_pos).normalize();
-        const poleDir = new THREE.Vector3().subVectors(this.pole.position, root_pos).normalize();
-        const n = new THREE.Vector3().crossVectors(chainDir, poleDir);
+        const chain_dir = new THREE.Vector3().subVectors(endeffector_pos, root_pos).normalize();
+        const pole_dir = new THREE.Vector3().subVectors(this.pole.position, root_pos).normalize();
+        const n = new THREE.Vector3().crossVectors(chain_dir, pole_dir);
 
         // degenerate when pole, root, end are collinear
         if (n.lengthSq() < 1e-6) n.set(0, 1, 0); else n.normalize();
@@ -367,9 +248,14 @@ export class IKChain {
     // solves using FABRIK
     // target is a position, in a space that is in space_ref
     solve(target, tolerance = 0.01, max_iterations = 50) {
+        let target_pos = target.position.clone();
+        let target_quat = target.quaternion.clone();
+
+        this.preRotateInitialGuess(target_pos);
+
+        return
+
         for (let i = 0; i < max_iterations; i++) {
-            let target_pos = target.position.clone();
-            let target_quat = target.quaternion.clone();
             this.doForwardPass(target_pos, target_quat);
             this.doBackwardPass(this.root_pos);
 

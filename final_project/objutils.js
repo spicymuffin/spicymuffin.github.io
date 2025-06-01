@@ -63,11 +63,11 @@ export function createArrows(options = {}) {
     const group = new THREE.Group();
 
     const origin = options.origin || new THREE.Vector3(0, 0, 0);
-    const xvec = options.xVec || new THREE.Vector3(1, 0, 0);
-    const yvec = options.yVec || new THREE.Vector3(0, 1, 0);
-    const zvec = options.zVec || new THREE.Vector3(0, 0, 1);
+    const xvec = options.xvec || new THREE.Vector3(1, 0, 0);
+    const yvec = options.yvec || new THREE.Vector3(0, 1, 0);
+    const zvec = options.zvec || new THREE.Vector3(0, 0, 1);
 
-    const shaft_radius = options.shaftRadius || 0.02;
+    const shaft_radius = options.shaft_radius || 0.02;
     const head_length_ratio = options.head_length_ratio || 0.1;
     const head_width_ratio = options.head_width_ratio || 2;
 
@@ -106,7 +106,6 @@ export function createArrows(options = {}) {
 
 
 export function createVector(options = {}) {
-
     const origin = options.origin || new THREE.Vector3(0, 0, 0);
     const vec = options.vec || new THREE.Vector3(1, 0, 0);
     const color = options.color || 0x00ff00; // green

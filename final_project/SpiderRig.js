@@ -30,7 +30,7 @@ export class SpiderRig {
         this.limb_count = options.limb_count || 8; // default to 8 limbs?
 
         // lengths of the levels, from level 0 to level 3
-        this.level_lengths = options.level_lengths || [0.5, 1.5, 1, 0.75];
+        this.level_lengths = options.level_lengths || [5.5, 1.5, 1, 0.75];
 
         // angles from front to back from fwd to limb
         this.oy_angles = options.angles || [Math.PI / 9 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
@@ -199,7 +199,7 @@ export class SpiderRig {
                 const chain = new IK.IKChain(
                     this.bone_levels[this.bone_levels.length - 1][lr][i],
                     this.bone_levels.length - 1, // level 0 should be static,
-                    parent_ref, // space reference
+                    this.parent_ref, // space reference
                     {}, // constraints
                     {
                         pole: this.poles[lr][i],
@@ -244,6 +244,37 @@ export class SpiderRig {
                     this.poles[lr][i].position.copy(pose_positions[lr][i]);
                 }
                 this.updateIKChain(lr, i);
+            }
+        }
+    }
+
+    updatePolePositions(options = {}) {
+        // if pole positions are provided, use them
+        if (options.pole_positions) {
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    if (options.pole_positions[lr] && options.pole_positions[lr][i]) {
+                        this.poles[lr][i].position.copy(options.pole_positions[lr][i]);
+                    }
+                    else {
+                        throw new Error(`pole position for ${i}th ${lr ? 'right' : 'left'} limb not provided`);
+                    }
+                }
+            }
+        }
+        // if pole positions are not provided, calculate halfway between root and target positions, add osme constant to y
+        else {
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    const target_pos = this.targets[lr][i].position.clone();
+                    const anchor_pos = this.bone_levels[1][lr][i].position.clone(); // the anchor is the second last bone in the chain
+
+                    // calculate the pole position as halfway between root and target, raised a bit
+                    const pole_pos = new THREE.Vector3().addVectors(anchor_pos, target_pos).multiplyScalar(0.5);
+                    pole_pos.y += 2; // raise it a bit
+
+                    this.poles[lr][i].position.copy(pole_pos);
+                }
             }
         }
     }
