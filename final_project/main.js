@@ -10,6 +10,8 @@ import { EditorControls } from './EditorControls.js';
 import { IKChain, IKJointConstraint, IKAxisConstraint } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
+import { SpiderRig } from './SpiderRig.js';
+
 const gui = new GUI();
 gui.domElement.style.position = 'absolute';
 gui.domElement.style.right = '265px';
@@ -23,7 +25,7 @@ const clock = new THREE.Clock();
 initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
-const groundPlane = objutils.createGroundPlane(false);
+const groundPlane = objutils.createGroundPlane();
 groundPlane.position.y = -6;
 scene.add(groundPlane);
 const axis = new THREE.AxesHelper(10);
@@ -100,6 +102,11 @@ gui.add(actions, 'action').name('Action');
 //    if some legs' anchors are too far from their targets, a repositioning sequence lerps anchors to targets
 // 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
 // 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
+
+const spider_rig = new SpiderRig(scene, {
+    position: new THREE.Vector3(0, 0, 0),
+});
+
 function render() {
     requestAnimationFrame(render);
     const delta = clock.getDelta();

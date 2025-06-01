@@ -108,6 +108,7 @@ export class IKAxisConstraint extends IKJointConstraint {
 
 //         joint_pos.sub(root_pos).applyQuaternion(q).add(root_pos);
 
+//         // THESE CREATE VECTOR CALLS ARE MALFORMED, use the new signature!
 //         // // draw vectors for debugging
 //         // if (this.debug) {
 //         //     this.chain_ref.space_ref.add(objutils.drawVector(
@@ -323,15 +324,6 @@ export class IKChain {
         }
     }
 
-    // index is the index of the joint to be biased towards the pole
-    lookupPole(index) {
-        if (this.poles[index]) {
-            return this.poles[index];
-        } else {
-            return null;
-        }
-    }
-
     calculateChainDirection() {
         // calculate the direction of the chain from root to tip
         const root_pos = this.bone_proxies[this.chain_len - 1].position;
@@ -365,10 +357,10 @@ export class IKChain {
             if (up.lengthSq() < 1e-8) continue;
 
             // TODO: rewrite with pure quaternions for stability (performance??)
-            const left = new THREE.Vector3().crossVectors(forward, up).normalize();
+            const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
             const m = new THREE.Matrix4();
-            m.makeBasis(left, forward, up); // +X, +Y, +Z
+            m.makeBasis(right, forward, up); // +X, +Y, +Z
             const q = new THREE.Quaternion().setFromRotationMatrix(m);
 
             joint.quaternion.copy(q);
