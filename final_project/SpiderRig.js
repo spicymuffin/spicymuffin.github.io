@@ -42,6 +42,8 @@ export class SpiderRig {
         // 0 - front, n - back
         this.bone_levels = Array.from({ length: 5 }, () => [[], []]);
 
+        this.ik_anchors = [[], []];
+
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
                 const bone = new THREE.Bone();
@@ -59,6 +61,9 @@ export class SpiderRig {
                 const up = new THREE.Vector3(0, 1, 0);
                 const fwd = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta)); // angles are front to back, so we use -cos
                 const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+
+                // store the static pole anchor position for this limb in parent space
+                this.ik_anchors[lr][i] = fwd.clone();
 
                 // set the rotation
                 const m = new THREE.Matrix4();
@@ -270,8 +275,8 @@ export class SpiderRig {
                     const anchor_pos = this.bone_levels[1][lr][i].position.clone(); // the anchor is the second last bone in the chain
 
                     // calculate the pole position as halfway between root and target, raised a bit
-                    const pole_pos = new THREE.Vector3().addVectors(anchor_pos, target_pos).multiplyScalar(0.5);
-                    pole_pos.y += 2; // raise it a bit
+                    const pole_pos = new THREE.Vector3().copy(target_pos);
+                    pole_pos.y += 3; // raise it a bit
 
                     this.poles[lr][i].position.copy(pole_pos);
                 }

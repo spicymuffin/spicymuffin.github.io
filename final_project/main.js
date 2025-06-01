@@ -139,9 +139,9 @@ function render() {
     }
 
     // update the poles
-    // spider_rig.updatePolePositions();
+    spider_rig.updatePolePositions();
     // update the IK chains
-    // spider_rig.updateIKChains();
+    spider_rig.updateIKChains();
 
     // GUI
     stats.update();

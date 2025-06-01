@@ -128,18 +128,19 @@ export class IKChain {
             this.bone_lengths.push(dist);
         }
 
-        this.anchor_bone_ref_space_ref_quat = translateQuaternion(
+        this.anchor_bone_ref_plus_x = translateVector(
+            new THREE.Vector3(1, 0, 0), // +X vector
             this.space_ref,
             this.anchor_bone_ref
-        ); // anchor bone's quaternion in the space_ref's local space
+        ); // translate +x vector in anchor_bone_ref space to space_ref space
 
         // offset of every joint from root in rest pose
         this.rest_offsets = [];
         for (let i = 0; i < this.chain_len - 1; ++i) {
-            // root-relative offset copied now so it never changes
+            // root-relative offset copied now we dont have to subtract root_pos every time later
             const off = this.bone_proxies[i].position.clone().sub(this.root_pos);
             this.rest_offsets.push(off);
-            if (this.debug) {
+            if (this.deep_debug) {
                 const vector = objutils.createVector({
                     origin: this.root_pos,
                     vec: off.clone(),
@@ -181,7 +182,23 @@ export class IKChain {
     }
 
     preRotateInitialGuess(target_pos_in_space_ref) {
+        // calculate the normal of the plane defined by the root, end effector and target
+        const anchor_target = new THREE.Vector3().subVectors(target_pos_in_space_ref, this.root_pos);
+        const anchor_pole = new THREE.Vector3().subVectors(this.pole.position, this.root_pos);
 
+        const normal = new THREE.Vector3().crossVectors(anchor_target, anchor_pole).normalize();
+
+        // generate a quaternion that rotates anchor_bone_ref_plus_x to point towards normal
+        const q = new THREE.Quaternion().setFromUnitVectors(
+            this.anchor_bone_ref_plus_x.clone().normalize(), // +X of the anchor bone in space_ref
+            normal // normal of the plane defined by the root, end effector and target
+        )
+
+        // apply the rotations to copies of the rest offsets, copy the results to the bone proxies
+        for (let i = 0; i < this.chain_len - 1; ++i) {
+            const rotated = this.rest_offsets[i].clone().applyQuaternion(q).add(this.root_pos);
+            this.bone_proxies[i].position.copy(rotated);
+        }
     }
 
 
@@ -252,8 +269,6 @@ export class IKChain {
         let target_quat = target.quaternion.clone();
 
         this.preRotateInitialGuess(target_pos);
-
-        return
 
         for (let i = 0; i < max_iterations; i++) {
             this.doForwardPass(target_pos, target_quat);
