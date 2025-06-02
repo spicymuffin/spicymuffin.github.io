@@ -1,72 +1,20 @@
 import * as THREE from 'three';
+import * as objutils from './objutils.js';
+import * as colors from './colors.js';
 
-export class EditorCameraControls {
-    constructor(camera, domElement = document.body) {
+import { SpiderRig } from './SpiderRig.js';
+
+// gets input (mouse and keyboard), applies it to the spider_root_ref. updates the spider_rig and camera
+export class SpiderController {
+    constructor(spider_root_ref, spider_rig, camera, dom_element = document.body, options = {}) {
+        this.spider_root_ref = spider_root_ref;
+        this.spider_rig = spider_rig;
         this.camera = camera;
-        this.domElement = domElement;
+        this.dom_element = dom_element;
 
         this.enabled = true;
-
-        this.moveSpeed = 10;
-        this.sensitivity = 0.002;
-
-        this.defaultSpeed = 10;
-        this.accelSpeed = 20;
-
-        this.inputs = {
-            forward: false,
-            backward: false,
-            left: false,
-            right: false,
-            up: false,
-            down: false,
-            accel: false,
-        };
-
-        this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
-
-        this.pitch = 0;
-        this.yaw = 0;
-
-        this.isDragging = false;
-        this.dragStart = new THREE.Vector2();
-
-        this._bindEvents();
-    }
-
-    // accepts a target of type THREE.Object3D or THREE.Vector3
-    // use to init rotation. this will also alter the yaw and pitch vars.
-    lookAt(target) {
-        this.camera.rotation.z = 0;
-
-        const up = new THREE.Vector3(0, 1, 0);
-        const targetPosition = new THREE.Vector3();
-        if (target instanceof THREE.Object3D) {
-            targetPosition.setFromMatrixPosition(target.matrixWorld);
-        } else if (target instanceof THREE.Vector3) {
-            targetPosition.copy(target);
-        } else {
-            alert("invalid target for lookAt");
-            return;
-        }
-
-        // compute forward vector (negative Z in camera space)
-        const zAxis = new THREE.Vector3().subVectors(this.camera.position, targetPosition).normalize();
-
-        // compute right vector
-        const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
-
-        // recompute orthogonal up vector
-        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-
-        // build the rotation matrix
-        const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
-
-        // apply rotation matrix to object
-        this.camera.quaternion.setFromRotationMatrix(rotMatrix);
-        this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
-        this.pitch = this.euler.x;
-        this.yaw = this.euler.y;
+        this.move_speed = 10;
+        this.sesnitivity = 0.002;
     }
 
     _bindEvents() {
@@ -91,9 +39,7 @@ export class EditorCameraControls {
             case 'KeyS': this.inputs.backward = true; break;
             case 'KeyA': this.inputs.left = true; break;
             case 'KeyD': this.inputs.right = true; break;
-            case 'KeyE': this.inputs.up = true; break;
-            case 'KeyQ': this.inputs.down = true; break;
-            case 'ShiftLeft': this.inputs.accel = true; break;
+            // case 'ShiftLeft': this.inputs.accel = true; break;
         }
     }
 
@@ -103,8 +49,6 @@ export class EditorCameraControls {
             case 'KeyS': this.inputs.backward = false; break;
             case 'KeyA': this.inputs.left = false; break;
             case 'KeyD': this.inputs.right = false; break;
-            case 'KeyE': this.inputs.up = false; break;
-            case 'KeyQ': this.inputs.down = false; break;
             case 'ShiftLeft': this.inputs.accel = false; break;
         }
     }
@@ -173,10 +117,6 @@ export class EditorCameraControls {
         this.camera.translateZ(velocity.z);
     }
 
-    dispose() {
-        this._unbindEvents();
-    }
-
     _unbindEvents() {
         this.domElement.removeEventListener('mousedown', this._onMouseDown);
         this.domElement.removeEventListener('wheel', this._onMouseScroll);
@@ -184,5 +124,9 @@ export class EditorCameraControls {
         document.removeEventListener('keyup', this._onKeyUp);
         document.removeEventListener('mouseup', this._onMouseUp);
         document.removeEventListener('mousemove', this._onMouseMove);
+    }
+
+    dispose() {
+        this._unbindEvents();
     }
 }

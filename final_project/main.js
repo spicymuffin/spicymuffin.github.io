@@ -8,10 +8,10 @@ import * as colors from './colors.js';
 import { EditorCameraControls } from './EditorCameraControls.js';
 import { EditorControls } from './EditorControls.js';
 
-import { IKChain } from './IKChain.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 import { SpiderRig } from './SpiderRig.js';
+import { SpiderController } from './SpiderController.js';
 
 const gui = new GUI();
 gui.domElement.style.position = 'absolute';
@@ -20,69 +20,33 @@ gui.domElement.style.right = '265px';
 const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
-const camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
+const editor_camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
+const spider_camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
 const clock = new THREE.Clock();
 
 initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
-const groundPlane = objutils.createGroundPlane();
-groundPlane.position.y = -6;
-scene.add(groundPlane);
+const ground_plane = objutils.createGroundPlane();
+ground_plane.position.y = -6;
+scene.add(ground_plane);
 const axis = new THREE.AxesHelper(10);
 axis.position.set(0, 0, 0);
 axis.raycast = () => { };
 scene.add(axis);
 
-const editorCameraControls = new EditorCameraControls(camera, renderer.domElement);
-const transformControls = new EditorControls(scene, camera, renderer.domElement, editorCameraControls, { mode: 'translate' });
+const editor_camera_controls = new EditorCameraControls(editor_camera, renderer.domElement);
+const editor_controls = new EditorControls(scene, editor_camera, renderer.domElement, editor_camera_controls, { mode: 'translate' });
 
-editorCameraControls.lookAt(new THREE.Vector3(0, 0, 0));
+const Mode = Object.freeze({
+    editor: 0,
+    spider: 1,
+});
 
-const target = objutils.createSphere({ radius: 0.4, color: 0xff0000, transparent: true, opacity: 0.5 });
-target.name = `target`;
-target.position.set(0, 3, 6);
-scene.add(target);
+let mode = Mode.editor;
+let camera = editor_camera;
 
-
-const nbones = 4;
-const bones = [];
-
-for (let i = 0; i < nbones; i++) {
-    const b = new THREE.Bone();
-    b.name = `bone_${i}`;
-
-    b.position.set(0, 0, 3);
-
-    if (i > 0) {
-        bones[i - 1].add(b);
-    }
-
-    bones.push(b);
-
-    // used for debugging
-    const sphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.05, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-    );
-    b.add(sphere);
-
-}
-
-scene.add(bones[0]);
-
-let constraints = [];
-
-const pole = objutils.createSphere({ radius: 0.3, color: 0xffff00, transparent: true, opacity: 0.5 });
-pole.name = `pole`;
-pole.position.set(0, 5, 3);
-scene.add(pole);
-
-constraints = {}
-
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: false, pole: pole });
-
-let realtimeIK = false;
+editor_camera_controls.lookAt(new THREE.Vector3(0, 0, 0));
 
 // spider locomomotion workflow:
 // 1. user gives some inputs (wasd)
@@ -92,12 +56,15 @@ let realtimeIK = false;
 // 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
 // 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
 
+let realtime_IK = false;
+
 const spider_root = objutils.createSphere({
     radius: 0.5,
     color: colors.white,
     transparent: true,
     opacity: 0.5,
 });
+
 spider_root.name = 'spider_root';
 scene.add(spider_root);
 
@@ -106,13 +73,35 @@ const spider_rig = new SpiderRig(spider_root, {
     debug: true,
 });
 
+const spider_contoller = new SpiderController(spider_root, spider_rig, spider_camera, renderer.domElement, {});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'c') {
+        // switch active camera
+        if (camera === editor_camera) {
+            mode = Mode.spider;
+            camera = spider_camera;
+            editor_camera_controls.enabled = false;
+            spider_contoller.enabled = true;
+        } else {
+            mode = Mode.editor;
+            camera = editor_camera;
+            editor_camera_controls.enabled = true;
+            spider_contoller.enabled = false;
+        }
+    }
+}, false);
+
 const actions = {
     runSolver: () => {
-        testIKChain.solve(target, 0.01, 10);
+        // update the poles
+        spider_rig.updatePolePositions();
+        // update the IK chains
+        spider_rig.updateIKChains();
     },
 
     flipRealtimeIK: () => {
-        realtimeIK = !realtimeIK;
+        realtime_IK = !realtime_IK;
     },
 
     action: () => {
@@ -129,27 +118,23 @@ function render() {
     requestAnimationFrame(render);
     const delta = clock.getDelta();
 
-    // update camera controls
-    editorCameraControls.update(delta);
-
-    // render the scene
-    renderer.render(scene, camera);
-
-    // update pole
-    const dir = new THREE.Vector3();
-    dir.subVectors(bones[0].position, target.position);
-
-    pole.position.copy(target.position.clone().add(dir.multiplyScalar(0.5)));
-    pole.position.y += 5;
-
-    if (realtimeIK) {
-        testIKChain.solve(target, 0.01, 10);
+    // update editor camera controls
+    if (mode === Mode.editor) {
+        editor_camera_controls.update(delta);
+    }
+    else {
+        spider_contoller.update(delta);
     }
 
-    // update the poles
-    spider_rig.updatePolePositions();
-    // update the IK chains
-    spider_rig.updateIKChains();
+    // render the scene
+    renderer.render(scene, editor_camera);
+
+    if (realtime_IK) {
+        // update the poles
+        spider_rig.updatePolePositions();
+        // update the IK chains
+        spider_rig.updateIKChains();
+    }
 
     // GUI
     stats.update();
