@@ -59,6 +59,14 @@ for (let i = 0; i < nbones; i++) {
     }
 
     bones.push(b);
+
+    // used for debugging
+    const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+    );
+    b.add(sphere);
+
 }
 
 scene.add(bones[0]);
@@ -72,7 +80,7 @@ scene.add(pole);
 
 constraints = {}
 
-const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: true, pole: pole });
+const testIKChain = new IKChain(bones[nbones - 1], nbones, scene, constraints, { debug: false, pole: pole });
 
 let realtimeIK = false;
 
