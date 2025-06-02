@@ -288,9 +288,44 @@ export class IKChain {
                 if (this.debug) {
                     console.log(`FABRIK converged in ${i + 1} iterations`);
                 }
+                this.world2LocalPosition(); // log the local positions and quaternions of the bones
                 return;
             }
         }
+    }
+
+    world2LocalPosition() {
+        // get locat position and local rotation of bones
+        const local_positions = [];
+        const local_quaternions = [];
+
+        for(let i = 0; i < this.bone_proxies.length; i++) {
+            if (i + 1 === this.bone_proxies.length) {
+                local_positions.push(this.bone_proxies[i].position.clone());
+                local_quaternions.push(this.bone_proxies[i].quaternion.clone());
+            } else {
+                // convert the position and quaternion to the local space of the previous bone
+                const parent_pos = this.bone_proxies[i + 1].position.clone();
+                const inv_parent_quat = this.bone_proxies[i + 1].quaternion.clone().invert();
+
+                const local_pos = this.bone_proxies[i].position.clone().sub(parent_pos).applyQuaternion(inv_parent_quat);
+                const local_quat = inv_parent_quat.clone().multiply(this.bone_proxies[i].quaternion.clone());
+
+                local_positions.push(local_pos);
+                local_quaternions.push(local_quat);
+            }
+        }
+
+        let iterator = this.end_effector_bone_ref;
+        for(let i = 0; i < this.chain_len; ++i) {
+            // copy the local positions and quaternions to the original bone
+            iterator.position.copy(local_positions[i]);
+            iterator.quaternion.copy(local_quaternions[i]);
+            
+            iterator = iterator.parent; 
+        }
+
+            
     }
 
     alignBones() {
