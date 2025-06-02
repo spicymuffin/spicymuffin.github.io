@@ -293,6 +293,30 @@ export class IKChain {
         }
     }
 
+    world2LocalPosition() {
+        // get locat position and local rotation of bones
+        const local_positions = [];
+        const local_quaternions = [];
+
+        for(let i = 0; i < this.bone_proxies.length; i++) {
+            if (i === 0) {
+                local_positions.push(this.bone_proxies[i].position.clone());
+                local_quaternions.push(this.bone_proxies[i].quaternion.clone());
+            } else {
+                // convert the position and quaternion to the local space of the previous bone
+                const parent_pos = this.bone_proxies[i - 1].position.clone();
+                const parent_quat = this.bone_proxies[i - 1].quaternion.clone();
+
+                const local_pos = this.bone_proxies[i].position.clone().sub(parent_pos).applyQuaternion(parent_quat.invert());
+                const local_quat = this.bone_proxies[i].quaternion.clone().multiply(parent_quat.invert());
+
+                local_positions.push(local_pos);
+                local_quaternions.push(local_quat);
+            }
+        }
+
+    }
+
     alignBones() {
         // iterate through all the bone proxies, align +Y of the parent to point towards the child
         for (let i = 1; i < this.bone_proxies.length; i++) {
