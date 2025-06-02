@@ -5,8 +5,8 @@ import { initStats, initRenderer, initCamera, initDefaultLighting, initDefaultDi
 import * as objutils from './objutils.js';
 import * as colors from './colors.js';
 
-import { EditorCameraControls } from './EditorCameraControls.js';
-import { EditorControls } from './EditorControls.js';
+import { EditorController } from './EditorController.js';
+import { TransformManipulator } from './TransformManipulator.js';
 
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
@@ -21,7 +21,7 @@ const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
 const editor_camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
-const spider_camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
+const spider_camera = initCamera({ position: { x: -7, y: 3, z: 13 }, fov: 60, look_at: new THREE.Vector3(0, 0, 0) });
 const clock = new THREE.Clock();
 
 initDefaultLighting(scene);
@@ -35,8 +35,8 @@ axis.position.set(0, 0, 0);
 axis.raycast = () => { };
 scene.add(axis);
 
-const editor_camera_controls = new EditorCameraControls(editor_camera, renderer.domElement);
-const editor_controls = new EditorControls(scene, editor_camera, renderer.domElement, editor_camera_controls, { mode: 'translate' });
+const editor_controller = new EditorController(editor_camera, renderer.domElement);
+const transform_manipulator = new TransformManipulator(scene, editor_camera, renderer.domElement, editor_controller, { mode: 'translate' });
 
 const Mode = Object.freeze({
     editor: 0,
@@ -46,7 +46,7 @@ const Mode = Object.freeze({
 let mode = Mode.editor;
 let camera = editor_camera;
 
-editor_camera_controls.lookAt(new THREE.Vector3(0, 0, 0));
+editor_controller.lookAt(new THREE.Vector3(0, 0, 0));
 
 // spider locomomotion workflow:
 // 1. user gives some inputs (wasd)
@@ -73,24 +73,36 @@ const spider_rig = new SpiderRig(spider_root, {
     debug: true,
 });
 
-const spider_contoller = new SpiderController(spider_root, spider_rig, spider_camera, renderer.domElement, {});
+const spider_controller = new SpiderController(spider_root, spider_rig, spider_camera, renderer.domElement, {});
 
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'c') {
-        // switch active camera
-        if (camera === editor_camera) {
-            mode = Mode.spider;
-            camera = spider_camera;
-            editor_camera_controls.enabled = false;
-            spider_contoller.enabled = true;
-        } else {
-            mode = Mode.editor;
-            camera = editor_camera;
-            editor_camera_controls.enabled = true;
-            spider_contoller.enabled = false;
-        }
+function switchMode() {
+    // switch mode
+    if (mode === Mode.editor) {
+        mode = Mode.spider;
+
+        camera = spider_camera;
+        editor_controller.enabled = false;
+        transform_manipulator.enabled = false;
+        spider_controller.enabled = true;
+        camera = spider_camera;
+    } else {
+        mode = Mode.editor;
+
+        camera = editor_camera;
+        editor_controller.enabled = true;
+        transform_manipulator.enabled = true;
+        spider_controller.enabled = false;
+        camera = editor_camera;
     }
-}, false);
+}
+
+function handleCameraSwitchKeydown(event) {
+    if (event.key === 'c') {
+        switchMode();
+    }
+}
+
+document.addEventListener('keydown', handleCameraSwitchKeydown, false);
 
 const actions = {
     runSolver: () => {
@@ -106,6 +118,10 @@ const actions = {
 
     action: () => {
         spider_rig.updateIKChains();
+    },
+
+    sc: () => {
+        switchMode();
     }
 };
 
@@ -113,6 +129,7 @@ const actions = {
 gui.add(actions, 'runSolver').name('Solve IK');
 gui.add(actions, 'flipRealtimeIK').name('Realtime IK');
 gui.add(actions, 'action').name('Action');
+gui.add(actions, 'sc').name('Switch Mode');
 
 function render() {
     requestAnimationFrame(render);
@@ -120,14 +137,14 @@ function render() {
 
     // update editor camera controls
     if (mode === Mode.editor) {
-        editor_camera_controls.update(delta);
+        editor_controller.update(delta);
     }
     else {
-        spider_contoller.update(delta);
+        spider_controller.update(delta);
     }
 
     // render the scene
-    renderer.render(scene, editor_camera);
+    renderer.render(scene, camera);
 
     if (realtime_IK) {
         // update the poles

@@ -3,7 +3,7 @@ import * as util from './util.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
-export class EditorControls {
+export class TransformManipulator {
     constructor(scene, camera, domElement, cameraControls = null, options = {}) {
         this.scene = scene;
         this.camera = camera;

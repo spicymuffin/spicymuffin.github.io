@@ -299,7 +299,7 @@ export class IKChain {
         const local_positions = [];
         const local_quaternions = [];
 
-        for(let i = 0; i < this.bone_proxies.length; i++) {
+        for (let i = 0; i < this.bone_proxies.length; i++) {
             if (i + 1 === this.bone_proxies.length) {
                 local_positions.push(this.bone_proxies[i].position.clone());
                 local_quaternions.push(this.bone_proxies[i].quaternion.clone());
@@ -317,15 +317,13 @@ export class IKChain {
         }
 
         let iterator = this.end_effector_bone_ref;
-        for(let i = 0; i < this.chain_len; ++i) {
+        for (let i = 0; i < this.chain_len; ++i) {
             // copy the local positions and quaternions to the original bone
             iterator.position.copy(local_positions[i]);
             iterator.quaternion.copy(local_quaternions[i]);
-            
-            iterator = iterator.parent; 
-        }
 
-            
+            iterator = iterator.parent;
+        }
     }
 
     alignBones() {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export class EditorCameraControls {
+export class EditorController {
     constructor(camera, domElement = document.body) {
         this.camera = camera;
         this.domElement = domElement;
@@ -86,6 +86,7 @@ export class EditorCameraControls {
     }
 
     _onKeyDown(e) {
+        if (!this.enabled) return;
         switch (e.code) {
             case 'KeyW': this.inputs.forward = true; break;
             case 'KeyS': this.inputs.backward = true; break;
@@ -98,6 +99,7 @@ export class EditorCameraControls {
     }
 
     _onKeyUp(e) {
+        if (!this.enabled) return;
         switch (e.code) {
             case 'KeyW': this.inputs.forward = false; break;
             case 'KeyS': this.inputs.backward = false; break;
@@ -110,6 +112,7 @@ export class EditorCameraControls {
     }
 
     _onMouseDown(e) {
+        if (!this.enabled) return;
         if (e.button === 2) { // right mouse button
             this.isDragging = true;
             this.domElement.requestPointerLock();
@@ -117,6 +120,7 @@ export class EditorCameraControls {
     }
 
     _onMouseUp(e) {
+        if (!this.enabled) return;
         if (e.button === 2) {
             this.isDragging = false;
             document.exitPointerLock();

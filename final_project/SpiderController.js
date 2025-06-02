@@ -15,6 +15,14 @@ export class SpiderController {
         this.enabled = true;
         this.move_speed = 10;
         this.sesnitivity = 0.002;
+
+        this.inputs = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            accel: false,
+        };
     }
 
     _bindEvents() {
@@ -34,16 +42,18 @@ export class SpiderController {
     }
 
     _onKeyDown(e) {
+        if (!this.enabled) return;
         switch (e.code) {
             case 'KeyW': this.inputs.forward = true; break;
             case 'KeyS': this.inputs.backward = true; break;
             case 'KeyA': this.inputs.left = true; break;
             case 'KeyD': this.inputs.right = true; break;
-            // case 'ShiftLeft': this.inputs.accel = true; break;
+            case 'escape': this.isDragging = false; document.exitPointerLock(); break;
         }
     }
 
     _onKeyUp(e) {
+        if (!this.enabled) return;
         switch (e.code) {
             case 'KeyW': this.inputs.forward = false; break;
             case 'KeyS': this.inputs.backward = false; break;
@@ -54,17 +64,16 @@ export class SpiderController {
     }
 
     _onMouseDown(e) {
-        if (e.button === 2) { // right mouse button
+        console.log('mousedown', e);
+        if (!this.enabled) return;
+        if (e.button === 1) { // left mouse button
             this.isDragging = true;
             this.domElement.requestPointerLock();
         }
     }
 
     _onMouseUp(e) {
-        if (e.button === 2) {
-            this.isDragging = false;
-            document.exitPointerLock();
-        }
+        // nothing for now
     }
 
     _onMouseScroll(e) {
@@ -80,7 +89,7 @@ export class SpiderController {
         const dx = e.movementX || 0;
         const dy = e.movementY || 0;
 
-        /* accumulate yaw / pitch */
+        // accumulate yaw / pitch
         this.yaw -= dx * this.sensitivity;
         this.pitch -= dy * this.sensitivity;
 

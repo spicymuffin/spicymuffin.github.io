@@ -43,9 +43,52 @@ export function initCanvasRenderer() {
 }
 
 export function initCamera(options = {}) {
-    const position = options.position || new THREE.Vector3(10, 10, 10);
+    function lookAt(target, camera) {
+        camera.rotation.z = 0;
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
+        const up = new THREE.Vector3(0, 1, 0);
+        const targetPosition = new THREE.Vector3();
+        if (target instanceof THREE.Object3D) {
+            targetPosition.setFromMatrixPosition(target.matrixWorld);
+        } else if (target instanceof THREE.Vector3) {
+            targetPosition.copy(target);
+        } else {
+            alert("invalid target for lookAt");
+            return;
+        }
+
+        // compute forward vector (negative Z in camera space)
+        const zAxis = new THREE.Vector3().subVectors(camera.position, targetPosition).normalize();
+
+        // compute right vector
+        const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+
+        // recompute orthogonal up vector
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+        // build the rotation matrix
+        const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+
+        // apply rotation matrix to object
+        camera.quaternion.setFromRotationMatrix(rotMatrix);
+    }
+
+    const position = options.position || new THREE.Vector3(10, 10, 10);
+    const fov = options.fov || 45;
+    const look_at = options.look_at || null;
+
+    const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 100000);
+
+    if (look_at) {
+        if (look_at instanceof THREE.Object3D) {
+            lookAt(look_at, camera);
+        } else if (look_at instanceof THREE.Vector3) {
+            lookAt(look_at, camera);
+        } else {
+            throw new Error("invalid look_at parameter");
+        }
+    }
+
     camera.position.copy(position);
 
     return camera;
