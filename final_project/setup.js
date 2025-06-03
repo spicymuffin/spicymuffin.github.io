@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import * as objutils from './objutils.js';
+import * as colors from './colors.js';
+
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import Stats from 'three/addons/libs/stats.module.js';
 
@@ -44,8 +47,6 @@ export function initCanvasRenderer() {
 
 export function initCamera(options = {}) {
     function lookAt(target, camera) {
-        camera.rotation.z = 0;
-
         const up = new THREE.Vector3(0, 1, 0);
         const targetPosition = new THREE.Vector3();
         if (target instanceof THREE.Object3D) {
@@ -69,27 +70,29 @@ export function initCamera(options = {}) {
         // build the rotation matrix
         const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
 
+        console.log("xAxis:", xAxis);
+        console.log("yAxis:", yAxis);
+        console.log("zAxis:", zAxis);
+
         // apply rotation matrix to object
         camera.quaternion.setFromRotationMatrix(rotMatrix);
     }
 
     const position = options.position || new THREE.Vector3(10, 10, 10);
     const fov = options.fov || 45;
-    const look_at = options.look_at || null;
+    let look_at = null;
+    if (options.look_at !== undefined && options.look_at !== null) {
+        console.log("initCamera: look_at is set to", options.look_at);
+        look_at = options.look_at;
+    }
 
     const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 100000);
 
-    if (look_at) {
-        if (look_at instanceof THREE.Object3D) {
-            lookAt(look_at, camera);
-        } else if (look_at instanceof THREE.Vector3) {
-            lookAt(look_at, camera);
-        } else {
-            throw new Error("invalid look_at parameter");
-        }
-    }
-
     camera.position.copy(position);
+
+    if (look_at) {
+        lookAt(look_at, camera);
+    }
 
     return camera;
 }
