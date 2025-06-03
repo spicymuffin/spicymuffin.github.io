@@ -78,12 +78,12 @@ export class SpiderRig {
             for (let lr = 0; lr < 2; lr++) {
                 for (let i = 0; i < this.limb_count / 2; i++) {
                     const bone = new THREE.Bone();
+                    bone.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_level${level}`;
+                    bone.position.set(0, this.level_lengths[level - 1], 0);
 
                     this.bone_levels[level - 1][lr][i].add(bone);
                     this.bone_levels[level][lr].push(bone);
 
-                    bone.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_level${level}`;
-                    bone.position.set(0, this.level_lengths[level - 1], 0);
                 }
             }
         }
@@ -229,6 +229,8 @@ export class SpiderRig {
             this.poles[lr][i].position.copy(pole_pos);
         }
 
+        // console.log("updating IK chain", lr, i, this.targets[lr][i].position, this.poles[lr][i].position);
+        // console.log(this.ik_chains[lr][i]);
         // console.log(`updating IK chain for ${i}th ${lr ? 'right' : 'left'} limb`);
 
         // update the IK chain
