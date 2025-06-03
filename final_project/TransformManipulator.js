@@ -45,6 +45,17 @@ export class TransformManipulator {
         window.addEventListener('keydown', this._onKeyDown);
     }
 
+    enable() {
+        this.enabled = true;
+        this.transform.enabled = true;
+    }
+
+    disable() {
+        this.enabled = false;
+        this.transform.enabled = false;
+        this.detach();
+    }
+
     _onPointerDown(event) {
         if (!this.enabled || event.button !== 0) return;
 

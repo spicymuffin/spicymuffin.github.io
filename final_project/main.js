@@ -20,9 +20,11 @@ gui.domElement.style.right = '265px';
 const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
-const editor_camera = initCamera({ position: { x: -7, y: 3, z: 13 } });
-const spider_camera = initCamera({ position: { x: -7, y: 3, z: 13 }, fov: 60, look_at: new THREE.Vector3(0, 0, 0) });
+const editor_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13) });
+const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 60, look_at: new THREE.Vector3(0, 0, 0) });
 const clock = new THREE.Clock();
+
+const cameraHelper = new THREE.CameraHelper(spider_camera);
 
 initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
@@ -35,7 +37,7 @@ axis.position.set(0, 0, 0);
 axis.raycast = () => { };
 scene.add(axis);
 
-const editor_controller = new EditorController(editor_camera, renderer.domElement);
+const editor_controller = new EditorController(editor_camera, renderer.domElement, { look_at: new THREE.Vector3(0, 0, 0) });
 const transform_manipulator = new TransformManipulator(scene, editor_camera, renderer.domElement, editor_controller, { mode: 'translate' });
 
 const Mode = Object.freeze({
@@ -45,8 +47,6 @@ const Mode = Object.freeze({
 
 let mode = Mode.editor;
 let camera = editor_camera;
-
-editor_controller.lookAt(new THREE.Vector3(0, 0, 0));
 
 // spider locomomotion workflow:
 // 1. user gives some inputs (wasd)
@@ -70,29 +70,31 @@ scene.add(spider_root);
 
 const spider_rig = new SpiderRig(spider_root, {
     position: new THREE.Vector3(0, -3, 0),
-    debug: true,
+    debug: false,
 });
 
 const spider_controller = new SpiderController(spider_root, spider_rig, spider_camera, renderer.domElement, {});
 
 function switchMode() {
-    // switch mode
+    // editor -> spider
     if (mode === Mode.editor) {
         mode = Mode.spider;
+        camera = spider_camera;
 
-        camera = spider_camera;
-        editor_controller.enabled = false;
-        transform_manipulator.enabled = false;
-        spider_controller.enabled = true;
-        camera = spider_camera;
-    } else {
+        spider_controller.enable();
+
+        editor_controller.disable();
+        transform_manipulator.disable();
+    }
+    // spider -> editor
+    else {
         mode = Mode.editor;
+        camera = editor_camera;
 
-        camera = editor_camera;
-        editor_controller.enabled = true;
-        transform_manipulator.enabled = true;
-        spider_controller.enabled = false;
-        camera = editor_camera;
+        editor_controller.enable();
+        transform_manipulator.enable();
+
+        spider_controller.disable();
     }
 }
 
