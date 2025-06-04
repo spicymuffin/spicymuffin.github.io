@@ -20,6 +20,10 @@ export function createBox(options = {}) {
     // generate the object3d (mesh, which is a subclass of object3d)
     const cube = new THREE.Mesh(geometry, material);
 
+    if (options.name) {
+        sphere.name = options.name;
+    }
+
     let position = options.position || new THREE.Vector3(0, 0, 0);
     cube.position.set(position.x, position.y, position.z);
 
@@ -48,6 +52,10 @@ export function createSphere(options = {}) {
     });
 
     const sphere = new THREE.Mesh(geometry, material);
+
+    if (options.name) {
+        sphere.name = options.name;
+    }
 
     const position = options.position || new THREE.Vector3(0, 0, 0);
     sphere.position.set(position.x, position.y, position.z);

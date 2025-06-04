@@ -49,12 +49,15 @@ let mode = Mode.editor;
 let camera = editor_camera;
 
 // spider locomomotion workflow:
-// 1. user gives some inputs (wasd)
-// 2. the spider position is updated (spider's body and target raycasters)
-//    this causes all the targets to move with the spider
-//    if some legs' anchors are too far from their targets, a repositioning sequence lerps anchors to targets
-// 3. a plane is fitted to the anchored (or all?) end effectors to give a rotation to the spider's body
-// 4. the IK solver is run to adjust the legs' bones to the new rotated body and the anchors' positions
+// 1. user gives some inputs (wasd, mouse), this input moves and rotates spider_root in its local space
+// 2. the raycasting object is delayed behind the spider_root with slerp or some custom interpolation function.
+//    we need to do this so the spider's body smoothly follows the user's inputs and not immediately.
+//    this implies that the raycasting object is not a child of spider_root, but a separate object that is
+//    updated every frame to lerp to spider_root's position and rotation.
+// 3. after the lerping step of the raycasting object, the spider_rig is updated. it checks how far each anchor
+//    is from the raycasting object's hit point, and updates the IK chains accordingly.
+//    this implies that spider_rig is also not a child of spider_root and not a child of the raycasting object, but
+//    a separate object that is updated every frame to match the spider_root's position and rotation.
 
 let realtime_IK = false;
 
@@ -63,10 +66,29 @@ const spider_root = objutils.createSphere({
     color: colors.white,
     transparent: true,
     opacity: 0.5,
+    name: 'spider_root',
 });
 
-spider_root.name = 'spider_root';
 scene.add(spider_root);
+
+const spider_raycaster = objutils.createSphere({
+    radius: 0.5,
+    color: colors.magenta,
+    transparent: true,
+    opacity: 0.5,
+});
+
+scene.add(spider_raycaster);
+
+const spider_rig_root = objutils.createSphere({
+    radius: 0.5,
+    color: colors.red,
+    transparent: true,
+    opacity: 0.5,
+    name: 'spider_rig_root',
+});
+
+scene.add(spider_rig_root);
 
 const spider_rig = new SpiderRig(spider_root, {
     position: new THREE.Vector3(0, -3, 0),
