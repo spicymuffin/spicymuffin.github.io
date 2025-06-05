@@ -121,10 +121,6 @@ function switchMode() {
     }
 }
 
-// hacky way to initialize mode
-switchMode(); // start in spider mode
-switchMode(); // switch to editor mode
-
 function handleCameraSwitchKeydown(event) {
     if (event.key === 'c') {
         switchMode();
