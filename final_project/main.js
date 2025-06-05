@@ -21,7 +21,7 @@ const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
 const editor_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13) });
-const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 60 });
+const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 50 });
 const clock = new THREE.Clock();
 
 const cameraHelper = new THREE.CameraHelper(spider_camera);
@@ -53,26 +53,23 @@ let camera = editor_camera;
 //    to the forward direction
 //    these inputs are applied relative to last frame's location of the spider_camera_root. we want this because the player expects
 //    the spider to move in relation to what he sees on the screen.
-// 2. the position delta and rotation delta are apploed to the raycasting object with a lerping delay only in rotation.
-//    the rotation of the raycasting object is delayed behind the spider_root with slerp or some custom interpolation function.
-//    we need to do this so the spider's body smoothly follows the user's inputs and not immediately.
-//    this implies that the raycasting object is not a child of spider_root, but a separate object that is
-//    updated every frame to lerp to spider_root's position and rotation.
-// 3. after the lerping step of the raycasting object, the spider_rig is updated. it checks how far each anchor
-//    is from the raycasting object's hit point, and updates the IK chains accordingly.
-//    this implies that spider_rig is also not a child of spider_root and not a child of the raycasting object, but
-//    a separate object that is updated every frame to match the spider_root's position and rotation.
+// 2. the position delta and rotation delta are also applied to the raycasting object.
+//    [with a lerping delay. this way, the spider will move smoothly to accommodate the user's inputs.] - no lerping for now, but can be added later...?
+// 3. the raycasting object is used to raycast against the ground plane to find the new position of the spider.
+// 4. the average normal vector of the raycast hits is used to determine the new up direction of the spider_camera_root
+//    this way, in the next frame, the movement/view plane will be aligned with the ground plane
+
 
 let realtime_IK = false;
 
-const spider_root = objutils.createBox({
+const spider_movement_root = objutils.createBox({
     color: colors.white,
     transparent: true,
-    opacity: 0.1,
-    name: 'spider_root',
+    opacity: 0.7,
+    name: 'spider_movement_root',
 });
 
-scene.add(spider_root);
+scene.add(spider_movement_root);
 
 const spider_camera_root = objutils.createSphere({
     radius: 0.2,
@@ -82,16 +79,7 @@ const spider_camera_root = objutils.createSphere({
     name: 'spider_camera_root',
 });
 
-spider_root.add(spider_camera_root);
-
-// const spider_raycaster = objutils.createSphere({
-//     radius: 0.5,
-//     color: colors.magenta,
-//     transparent: true,
-//     opacity: 0.5,
-// });
-
-// scene.add(spider_raycaster);
+scene.add(spider_camera_root);
 
 const spider_rig_root = objutils.createSphere({
     radius: 0.5,
@@ -105,10 +93,10 @@ scene.add(spider_rig_root);
 
 const spider_rig = new SpiderRig(spider_rig_root, {
     position: new THREE.Vector3(0, -3, 0),
-    debug: false,
+    debug: true,
 });
 
-const spider_controller = new SpiderController(spider_root, spider_rig, spider_camera_root, spider_camera, renderer.domElement, {});
+const spider_controller = new SpiderController(spider_movement_root, spider_rig, spider_camera_root, spider_camera, renderer.domElement, {});
 
 function switchMode() {
     // editor -> spider

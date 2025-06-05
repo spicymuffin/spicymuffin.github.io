@@ -74,6 +74,62 @@ export function createSphere(options = {}) {
     return sphere;
 }
 
+function create_cone(options) {
+    options = options || {};
+
+    const radius = options.radius !== undefined ? options.radius : 1;
+    const height = options.height !== undefined ? options.height : 2;
+    const radial_segments = options.radialSegments || 32;
+    const height_segments = options.heightSegments || 1;
+    const open_ended = options.openEnded || false;
+    const theta_start = options.thetaStart || 0;
+    const theta_length = options.thetaLength || Math.PI * 2;
+
+    const geometry = new THREE.ConeGeometry(
+        radius,
+        height,
+        radial_segments,
+        height_segments,
+        open_ended,
+        theta_start,
+        theta_length
+    );
+
+    // move base to origin, tip to +Y
+    geometry.translate(0, height / 2, 0);
+
+    if (options.ptr_position && options.ptr_direction) {
+        const direction = options.ptr_direction.clone().normalize();
+        const rotation_quat = new THREE.Quaternion();
+        rotation_quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        geometry.applyQuaternion(rotation_quat);
+        geometry.translate(
+            options.ptr_position.x,
+            options.ptr_position.y,
+            options.ptr_position.z
+        );
+    }
+
+    const material = options.material || new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const mesh = new THREE.Mesh(geometry, material);
+
+    if (options.position) {
+        mesh.position.copy(options.position);
+    }
+
+    if (options.rotation) {
+        mesh.rotation.copy(options.rotation);
+    }
+
+    if (options.scale) {
+        mesh.scale.copy(options.scale);
+    }
+
+    return mesh;
+}
+
+
+
 // just use THREE.AxisHelper btw, dont use this, this sucks
 export function createArrows(options = {}) {
     const group = new THREE.Group();

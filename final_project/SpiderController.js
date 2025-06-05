@@ -6,7 +6,7 @@ import { SpiderRig } from './SpiderRig.js';
 
 // gets input (mouse and keyboard), applies it to the spider_root_ref. updates the spider_rig and camera
 export class SpiderController {
-    constructor(spider_root_ref, spider_rig, spider_camera_root_ref, camera, dom_element = document.body, options = {}) {
+    constructor(spider_movement_root_ref, spider_rig, spider_camera_root_ref, camera, dom_element = document.body, options = {}) {
         this.spider_camera_root_ref = spider_camera_root_ref;
         this.camera = camera;
 
@@ -36,21 +36,69 @@ export class SpiderController {
         };
 
         this.spider_rig = spider_rig;
-        this.spider_root_ref = spider_root_ref;
+        this.spider_movement_root_ref = spider_movement_root_ref;
+
+        this.limb_count = 8;
+        if (options.limb_count) {
+            this.limb_count = options.limb_count;
+        }
+
+        this.oy_angles = options.oy_angles || [Math.PI / 9 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
+        this.target_raycaster_z_offsets = options.target_raycaster_z_offsets || [3, 3, 3, 3];
+        this.target_raycaster_y_offsets = options.target_raycaster_y_offsets || [-1, -1, -1, -1];
+
+        // initialize raycaster positions
+        this.target_raycasters = [[], []];
+
+        // for (let lr = 0; lr < 2; lr++) {
+        //     for (let i = 0; i < this.limb_count / 2; i++) {
+        //         const raycaster_origin = new THREE.Object3D();
+
+        //         this.spider_movement_root_ref.add(raycaster_origin);
+        //         this.target_raycasters[lr].push(raycaster_origin);
+
+        //         bone.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_level0`;
+        //         bone.position.set(0, 0, 0);
+
+        //         // picture a trigonometric circle where y is x, x is z
+        //         // left is +x, right is -x
+        //         const theta = (lr ? -1 : 1) * this.oy_angles[i]
+
+        //         const up = new THREE.Vector3(0, 1, 0);
+        //         const fwd = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta)); // angles are front to back, so we use -cos
+        //         const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+
+        //         // store the static pole anchor position for this limb in parent space
+        //         this.ik_anchors[lr][i] = fwd.clone().multiplyScalar(this.level_lengths[0]);
+
+        //         // set the rotation
+        //         const m = new THREE.Matrix4();
+        //         m.makeBasis(right, fwd, up); // +X, +Y, +Z
+        //         const q = new THREE.Quaternion().setFromRotationMatrix(m);
+        //         bone.quaternion.copy(q);
+        //     }
+        // }
+
+        if (options.target_raycasters_positions) {
+            this.target_raycasters = options.target_raycasters_positions;
+        }
+
 
         this.spider_camera_root_ref.add(this.camera);
-        this.spider_root_ref.add(this.spider_camera_root_ref);
+        // this.spider_root_ref.add(this.spider_camera_root_ref);
+
+        this.x_offset = 0;
 
         if (options.offset) {
             this.camera.position.copy(options.offset);
         }
         else {
-            this.camera.position.set(0, 2, -6); // default offset
+            this.camera.position.set(this.x_offset, 2, -6); // default offset
         }
 
-        this.look_at_target = new THREE.Vector3(0, 0, 0); // default look at target
-        if (options.look_at_target) {
-            this.look_at_target = options.look_at_target;
+        this.look_at_target = new THREE.Vector3(this.x_offset, 0, 0); // default look at target
+        if (options.offset) {
+            this.look_at_target.x = options.offset.x;
         }
 
         this.lookAt(this.look_at_target); // default look at
@@ -194,6 +242,7 @@ export class SpiderController {
         const PI_2 = Math.PI / 2;
         this.pitch = Math.max(-PI_2, Math.min(PI_2, this.pitch));
 
+        // after this step, we have the movement direction (yaw)
         this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
         this.spider_camera_root_ref.quaternion.setFromEuler(this.euler);
     }
@@ -215,10 +264,24 @@ export class SpiderController {
 
         velocity.normalize().multiplyScalar(this.move_speed * delta);
 
-        // move in local space
-        this.spider_root_ref.translateX(velocity.x);
-        this.spider_root_ref.translateY(velocity.y);
-        this.spider_root_ref.translateZ(velocity.z);
+
+        // calculate the yaw rotation
+        const spider_movement_euler = new THREE.Euler(0, this.yaw, 0, 'YXZ');
+        // copy only yaw to spider movement root
+        // NOTE: right now, we just copy (no lerp) later we can add a lerp to smooth the movement, or disable the copying at all if the user presses alt, for example
+        // to pan around the spider freely without affecting the spider's rotation
+        this.spider_movement_root_ref.quaternion.setFromEuler(spider_movement_euler);
+
+        // rotate velocity so it matches the camera's look direction
+        velocity.applyQuaternion(this.spider_movement_root_ref.quaternion);
+
+        // apply the velocity to the spider movement root
+        this.spider_movement_root_ref.position.add(velocity);
+
+        // update the position of the camera so it follows the spider movement root
+        this.spider_camera_root_ref.position.copy(this.spider_movement_root_ref.position);
+
+
     }
 
     dispose() {
