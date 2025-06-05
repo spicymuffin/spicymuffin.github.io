@@ -124,7 +124,7 @@ export class IKChain {
                     const bone = objutils.createBox({
                         size: new THREE.Vector3(bonevis_thickness, bonevis_length, bonevis_thickness),
                         color: 0xffffff,
-                        originShift: new THREE.Vector3(0, -0.5 * bonevis_length, 0)
+                        origin_shift: new THREE.Vector3(0, -0.5 * bonevis_length, 0)
                     });
 
                     sphere.add(bone);

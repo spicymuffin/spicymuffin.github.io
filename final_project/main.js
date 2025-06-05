@@ -21,7 +21,7 @@ const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
 const editor_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13) });
-const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 50 });
+const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 60 });
 const clock = new THREE.Clock();
 
 const cameraHelper = new THREE.CameraHelper(spider_camera);
@@ -48,6 +48,9 @@ const Mode = Object.freeze({
 let mode = Mode.editor;
 let camera = editor_camera;
 
+// all walkable surfaces need to be on layer 3
+ground_plane.layers.enable(3);
+
 // spider locomomotion overview:
 // 1. user gives some inputs (wasd, mouse). the rotation defines the forward dirction, the wasd keys define the motion relative
 //    to the forward direction
@@ -60,12 +63,12 @@ let camera = editor_camera;
 //    this way, in the next frame, the movement/view plane will be aligned with the ground plane
 
 
-let realtime_IK = false;
+let realtime_IK = true;
 
 const spider_movement_root = objutils.createBox({
     color: colors.white,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.9,
     name: 'spider_movement_root',
 });
 
@@ -96,7 +99,7 @@ const spider_rig = new SpiderRig(spider_rig_root, {
     debug: true,
 });
 
-const spider_controller = new SpiderController(spider_movement_root, spider_rig, spider_camera_root, spider_camera, renderer.domElement, {});
+const spider_controller = new SpiderController(scene, spider_movement_root, spider_rig, spider_camera_root, spider_camera, renderer.domElement, { debug: true });
 
 function switchMode() {
     // editor -> spider
@@ -120,6 +123,9 @@ function switchMode() {
         spider_controller.disable();
     }
 }
+
+switchMode();
+switchMode(); // call it twice to ensure the initial state is set correctly (bad bad bad)
 
 function handleCameraSwitchKeydown(event) {
     if (event.key === 'c') {

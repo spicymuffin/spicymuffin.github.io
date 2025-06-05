@@ -4,11 +4,16 @@ import * as colors from './colors.js';
 
 import { SpiderRig } from './SpiderRig.js';
 
+export const walkable_layer = 3; // layer for walkable surfaces
+
 // gets input (mouse and keyboard), applies it to the spider_root_ref. updates the spider_rig and camera
 export class SpiderController {
-    constructor(spider_movement_root_ref, spider_rig, spider_camera_root_ref, camera, dom_element = document.body, options = {}) {
+    constructor(scene_ref, spider_movement_root_ref, spider_rig_ref, spider_camera_root_ref, camera_ref, dom_element = document.body, options = {}) {
+        this.scene_ref = scene_ref;
+        this.spider_movement_root_ref = spider_movement_root_ref;
+        this.spider_rig_ref = spider_rig_ref;
         this.spider_camera_root_ref = spider_camera_root_ref;
-        this.camera = camera;
+        this.camera_ref = camera_ref;
 
         this.dom_element = dom_element;
 
@@ -35,65 +40,118 @@ export class SpiderController {
             accel: false,
         };
 
-        this.spider_rig = spider_rig;
-        this.spider_movement_root_ref = spider_movement_root_ref;
+        this.debug = false;
+        if (options.debug) {
+            this.debug = options.debug;
+        }
 
         this.limb_count = 8;
         if (options.limb_count) {
             this.limb_count = options.limb_count;
         }
 
+        const default_z_offset = 3;
+        const default_y_offset = -2;
+
         this.oy_angles = options.oy_angles || [Math.PI / 9 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
-        this.target_raycaster_z_offsets = options.target_raycaster_z_offsets || [3, 3, 3, 3];
-        this.target_raycaster_y_offsets = options.target_raycaster_y_offsets || [-1, -1, -1, -1];
+        this.raycaster_z_offsets = options.raycaster_z_offsets || [default_z_offset, default_z_offset, default_z_offset, default_z_offset];
+        this.raycaster_y_offsets = options.raycaster_y_offsets || [default_y_offset, default_y_offset, default_y_offset, default_y_offset];
 
         // initialize raycaster positions
-        this.target_raycasters = [[], []];
+        this.raycaster_origins = [[], []];
+        this.raycaster_directions = [[], []];
+        this.raycaster_objects = [[], []];
 
-        // for (let lr = 0; lr < 2; lr++) {
-        //     for (let i = 0; i < this.limb_count / 2; i++) {
-        //         const raycaster_origin = new THREE.Object3D();
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const raycaster_origin = new THREE.Object3D();
 
-        //         this.spider_movement_root_ref.add(raycaster_origin);
-        //         this.target_raycasters[lr].push(raycaster_origin);
+                this.spider_movement_root_ref.add(raycaster_origin);
+                this.raycaster_origins[lr].push(raycaster_origin);
 
-        //         bone.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_level0`;
-        //         bone.position.set(0, 0, 0);
+                raycaster_origin.name = `target_raycaster_${lr}_${i}`;
 
-        //         // picture a trigonometric circle where y is x, x is z
-        //         // left is +x, right is -x
-        //         const theta = (lr ? -1 : 1) * this.oy_angles[i]
+                // picture a trigonometric circle where y is x, x is z
+                // left is +x, right is -x
+                const theta = (lr ? -1 : 1) * this.oy_angles[i];
 
-        //         const up = new THREE.Vector3(0, 1, 0);
-        //         const fwd = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta)); // angles are front to back, so we use -cos
-        //         const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+                const pos = new THREE.Vector3(Math.sin(theta) * this.raycaster_z_offsets[i], this.raycaster_y_offsets[i], Math.cos(theta) * this.raycaster_z_offsets[i]); // angles are front to back, so we use -cos
+                raycaster_origin.position.copy(pos);
 
-        //         // store the static pole anchor position for this limb in parent space
-        //         this.ik_anchors[lr][i] = fwd.clone().multiplyScalar(this.level_lengths[0]);
+                // set the direction of the raycaster
+                const raycaster_direction = new THREE.Vector3(0, -1, 0); // pointing down
+                this.raycaster_directions[lr].push(raycaster_direction);
 
-        //         // set the rotation
-        //         const m = new THREE.Matrix4();
-        //         m.makeBasis(right, fwd, up); // +X, +Y, +Z
-        //         const q = new THREE.Quaternion().setFromRotationMatrix(m);
-        //         bone.quaternion.copy(q);
-        //     }
-        // }
+                // create a raycaster object
+                const raycaster_object = new THREE.Raycaster();
+                // set the raycaster near and far for performance
+                raycaster_object.near = 0;
+                raycaster_object.far = 10; // far enough to reach the ground
+                // dont set the origin, direction. because they are world space, we need to convert the local space to world space
+                // every frame
+                raycaster_object.layers.set(walkable_layer); // walkable layer is 3
+                this.raycaster_objects[lr].push(raycaster_object);
 
-        if (options.target_raycasters_positions) {
-            this.target_raycasters = options.target_raycasters_positions;
+                if (this.debug) {
+                    const cone_height = 0.5;
+                    const downward_dir = new THREE.Vector3(0, -1, 0);
+
+                    const raycaster_visualizer = objutils.createCone({
+                        radius: 0.1,
+                        height: cone_height,
+
+                        ptr_position: new THREE.Vector3(0, 0, 0),
+                        ptr_direction: downward_dir,
+                    });
+
+                    raycaster_origin.add(raycaster_visualizer);
+
+                    const ray_visualizer = objutils.createBox({
+                        size: new THREE.Vector3(0.005, 20, 0.005),
+                        color: colors.red,
+                        opacity: 0.5,
+                        origin_shift: new THREE.Vector3(0, 10, 0), // shift the origin to the top of the ray
+                    });
+
+                    raycaster_origin.add(ray_visualizer);
+                }
+            }
         }
 
+        if (options.debug) {
+            this.raycaster_hit_visualizers = [[], []];
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    const raycaster_hit_visualizer = objutils.createBox({
+                        size: new THREE.Vector3(0.1, 0.1, 0.1),
+                        color: colors.maroon,
+                        opacity: 0.5,
+                    });
 
-        this.spider_camera_root_ref.add(this.camera);
+                    this.spider_movement_root_ref.parent.add(raycaster_hit_visualizer);
+                    this.raycaster_hit_visualizers[lr].push(raycaster_hit_visualizer);
+                }
+            }
+        }
+
+        if (options.raycaster_origins) {
+            this.raycaster_origins = options.raycaster_origins;
+        }
+
+        if (options.raycasting_candidates) {
+            this.raycasting_candidates = options.raycasting_candidates;
+        }
+
+        this.spider_camera_root_ref.add(this.camera_ref);
         // this.spider_root_ref.add(this.spider_camera_root_ref);
 
         this.x_offset = 0;
 
         if (options.offset) {
-            this.camera.position.copy(options.offset);
+            this.camera_ref.position.copy(options.offset);
         }
         else {
-            this.camera.position.set(this.x_offset, 2, -6); // default offset
+            this.camera_ref.position.set(this.x_offset, 2, -6); // default offset
         }
 
         this.look_at_target = new THREE.Vector3(this.x_offset, 0, 0); // default look at target
@@ -130,7 +188,7 @@ export class SpiderController {
     // accepts a target of type THREE.Object3D or THREE.Vector3
     // use to init rotation. this will also alter the yaw and pitch vars.
     lookAt(target) {
-        this.camera.rotation.z = 0;
+        this.camera_ref.rotation.z = 0;
 
         const up = new THREE.Vector3(0, 1, 0);
         const target_position = new THREE.Vector3();
@@ -144,7 +202,7 @@ export class SpiderController {
         }
 
         // compute forward vector (negative Z in camera space)
-        const z_axis = new THREE.Vector3().subVectors(this.camera.position, target_position).normalize();
+        const z_axis = new THREE.Vector3().subVectors(this.camera_ref.position, target_position).normalize();
 
         // compute right vector
         const x_axis = new THREE.Vector3().crossVectors(up, z_axis).normalize();
@@ -156,8 +214,8 @@ export class SpiderController {
         const m = new THREE.Matrix4().makeBasis(x_axis, y_axis, z_axis);
 
         // apply rotation matrix to object
-        this.camera.quaternion.setFromRotationMatrix(m);
-        this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
+        this.camera_ref.quaternion.setFromRotationMatrix(m);
+        this.euler.setFromQuaternion(this.camera_ref.quaternion, 'YXZ');
         this.pitch = this.euler.x;
         this.yaw = this.euler.y;
     }
@@ -247,8 +305,47 @@ export class SpiderController {
         this.spider_camera_root_ref.quaternion.setFromEuler(this.euler);
     }
 
+    doRaycasts() {
+        this.spider_movement_root_ref.updateWorldMatrix(true, false);
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                // retrieve the raycaster origin and direction
+                const raycaster_origin = this.raycaster_origins[lr][i];
+                const raycaster_direction = this.raycaster_directions[lr][i];
+
+                // retrueve the raycaster object
+                const raycaster_object = this.raycaster_objects[lr][i];
+
+                // translate a global position for the raycaster
+                const raycaster_world_position = new THREE.Vector3();
+                raycaster_origin.getWorldPosition(raycaster_world_position);
+                // translate the raycaster direction to world space
+                const raycaster_world_direction = raycaster_direction.clone();
+                raycaster_world_direction.applyQuaternion(raycaster_origin.getWorldQuaternion(new THREE.Quaternion()));
+
+                // shoot the ray
+                raycaster_object.set(raycaster_world_position, raycaster_world_direction);
+
+                let intersections = null;
+                if (this.raycasting_candidates) {
+                    intersections = raycaster_object.intersectObjects(this.raycasting_candidates, true);
+                }
+                else {
+                    intersections = raycaster_object.intersectObjects(this.scene_ref.children, true);
+                }
+
+                if (intersections.length > 0) {
+                    if (this.debug) {
+                        // update the raycaster hit visualizer
+                        this.raycaster_hit_visualizers[lr][i].position.copy(intersections[0].point);
+                    }
+                }
+            }
+        }
+    }
+
     update(delta) {
-        if (!this.enabled) return;
+        if (!this.enabled);
 
         const velocity = new THREE.Vector3(0, 0, 0);
 
@@ -281,7 +378,7 @@ export class SpiderController {
         // update the position of the camera so it follows the spider movement root
         this.spider_camera_root_ref.position.copy(this.spider_movement_root_ref.position);
 
-
+        this.doRaycasts();
     }
 
     dispose() {

@@ -127,7 +127,7 @@ export class SpiderRig {
                                 sphere_radius: 0.1,
                                 axis: true,
                                 child: bone.children[0],
-                                thickness: 0.04,
+                                thickness: 0.08,
                             });
                             recursive_step(bone.children[0]);
                         }
