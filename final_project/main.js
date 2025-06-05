@@ -21,7 +21,7 @@ const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
 const editor_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13) });
-const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 60, look_at: new THREE.Vector3(0, 0, 0) });
+const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 60 });
 const clock = new THREE.Clock();
 
 const cameraHelper = new THREE.CameraHelper(spider_camera);
@@ -48,9 +48,13 @@ const Mode = Object.freeze({
 let mode = Mode.editor;
 let camera = editor_camera;
 
-// spider locomomotion workflow:
-// 1. user gives some inputs (wasd, mouse), this input moves and rotates spider_root in its local space
-// 2. the raycasting object is delayed behind the spider_root with slerp or some custom interpolation function.
+// spider locomomotion overview:
+// 1. user gives some inputs (wasd, mouse). the rotation defines the forward dirction, the wasd keys define the motion relative
+//    to the forward direction
+//    these inputs are applied relative to last frame's location of the spider_camera_root. we want this because the player expects
+//    the spider to move in relation to what he sees on the screen.
+// 2. the position delta and rotation delta are apploed to the raycasting object with a lerping delay only in rotation.
+//    the rotation of the raycasting object is delayed behind the spider_root with slerp or some custom interpolation function.
 //    we need to do this so the spider's body smoothly follows the user's inputs and not immediately.
 //    this implies that the raycasting object is not a child of spider_root, but a separate object that is
 //    updated every frame to lerp to spider_root's position and rotation.
@@ -61,24 +65,33 @@ let camera = editor_camera;
 
 let realtime_IK = false;
 
-const spider_root = objutils.createSphere({
-    radius: 0.5,
+const spider_root = objutils.createBox({
     color: colors.white,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.1,
     name: 'spider_root',
 });
 
 scene.add(spider_root);
 
-const spider_raycaster = objutils.createSphere({
-    radius: 0.5,
-    color: colors.magenta,
+const spider_camera_root = objutils.createSphere({
+    radius: 0.2,
+    color: colors.green,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.4,
+    name: 'spider_camera_root',
 });
 
-scene.add(spider_raycaster);
+spider_root.add(spider_camera_root);
+
+// const spider_raycaster = objutils.createSphere({
+//     radius: 0.5,
+//     color: colors.magenta,
+//     transparent: true,
+//     opacity: 0.5,
+// });
+
+// scene.add(spider_raycaster);
 
 const spider_rig_root = objutils.createSphere({
     radius: 0.5,
@@ -90,12 +103,12 @@ const spider_rig_root = objutils.createSphere({
 
 scene.add(spider_rig_root);
 
-const spider_rig = new SpiderRig(spider_root, {
+const spider_rig = new SpiderRig(spider_rig_root, {
     position: new THREE.Vector3(0, -3, 0),
     debug: false,
 });
 
-const spider_controller = new SpiderController(spider_root, spider_rig, spider_camera, renderer.domElement, {});
+const spider_controller = new SpiderController(spider_root, spider_rig, spider_camera_root, spider_camera, renderer.domElement, {});
 
 function switchMode() {
     // editor -> spider
@@ -119,6 +132,10 @@ function switchMode() {
         spider_controller.disable();
     }
 }
+
+// hacky way to initialize mode
+switchMode(); // start in spider mode
+switchMode(); // switch to editor mode
 
 function handleCameraSwitchKeydown(event) {
     if (event.key === 'c') {

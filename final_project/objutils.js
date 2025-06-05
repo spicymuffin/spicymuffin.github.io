@@ -10,18 +10,26 @@ export function createBox(options = {}) {
 
     const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
 
+    const opacity = options.opacity || 1.0;
+
+    const is_transparent = opacity < 1.0;
+
     // shift the geometry to the center of the box
     geometry.translate(-originShift.x, -originShift.y, -originShift.z);
 
     // material for the mesh
     const matColor = options.color || 0x00ff00;
-    const material = new THREE.MeshLambertMaterial({ color: matColor });
+    const material = new THREE.MeshLambertMaterial({
+        color: matColor,
+        transparent: is_transparent,
+        opacity: opacity
+    });
 
     // generate the object3d (mesh, which is a subclass of object3d)
     const cube = new THREE.Mesh(geometry, material);
 
     if (options.name) {
-        sphere.name = options.name;
+        cube.name = options.name;
     }
 
     let position = options.position || new THREE.Vector3(0, 0, 0);

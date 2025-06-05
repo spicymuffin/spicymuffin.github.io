@@ -6,8 +6,10 @@ import { SpiderRig } from './SpiderRig.js';
 
 // gets input (mouse and keyboard), applies it to the spider_root_ref. updates the spider_rig and camera
 export class SpiderController {
-    constructor(spider_root_ref, spider_rig, camera, dom_element = document.body, options = {}) {
+    constructor(spider_root_ref, spider_rig, spider_camera_root_ref, camera, dom_element = document.body, options = {}) {
+        this.spider_camera_root_ref = spider_camera_root_ref;
         this.camera = camera;
+
         this.dom_element = dom_element;
 
         this.enabled = true;
@@ -36,7 +38,9 @@ export class SpiderController {
         this.spider_rig = spider_rig;
         this.spider_root_ref = spider_root_ref;
 
-        this.spider_root_ref.add(this.camera);
+        this.spider_camera_root_ref.add(this.camera);
+        this.spider_root_ref.add(this.spider_camera_root_ref);
+
         if (options.offset) {
             this.camera.position.copy(options.offset);
         }
@@ -191,7 +195,7 @@ export class SpiderController {
         this.pitch = Math.max(-PI_2, Math.min(PI_2, this.pitch));
 
         this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
-        this.camera.quaternion.setFromEuler(this.euler);
+        this.spider_camera_root_ref.quaternion.setFromEuler(this.euler);
     }
 
     update(delta) {
