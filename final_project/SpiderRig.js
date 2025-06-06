@@ -34,7 +34,7 @@ export class SpiderRig {
         this.level_lengths = options.level_lengths || [1, 1.5, 1, 0.75];
 
         // angles from front to back from fwd to limb
-        this.oy_angles = options.oy_angles || [Math.PI / 9 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
+        this.oy_angles = options.oy_angles || [Math.PI / 16 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
 
         // angles from level 0 to level 3 from parent space up
         this.ox_angles = options.ox_angles || [degToRad(20), degToRad(-10), degToRad(-60), degToRad(-20)];
