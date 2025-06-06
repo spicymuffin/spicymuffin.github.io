@@ -286,7 +286,7 @@ export class IKChain {
             if (dist < tolerance) {
                 // if the end effector is within tolerance, we are done
                 if (this.debug) {
-                    console.log(`FABRIK converged in ${i + 1} iterations`);
+                    // console.log(`FABRIK converged in ${i + 1} iterations`);
                 }
                 break;
             }
@@ -301,8 +301,7 @@ export class IKChain {
 
         for (let i = 0; i < this.bone_proxies.length; i++) {
             if (i + 1 === this.bone_proxies.length) {
-                
-                const parent_pos = new THREE.Vector3(0, -3, 0);
+                const parent_pos = new THREE.Vector3(0, 0, 0);
                 const inv_parent_quat = this.anchor_bone_ref.parent.quaternion.clone().invert();
 
                 const local_pos = this.bone_proxies[i].position.clone().sub(parent_pos).applyQuaternion(inv_parent_quat);

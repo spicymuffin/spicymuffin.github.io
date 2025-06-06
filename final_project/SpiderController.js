@@ -2,36 +2,63 @@ import * as THREE from 'three';
 import * as objutils from './objutils.js';
 import * as colors from './colors.js';
 
+import { SpiderLegStepper } from './SpiderLegStepper.js';
 import { SpiderRig } from './SpiderRig.js';
 
 export const walkable_layer = 3; // layer for walkable surfaces
 
 // gets input (mouse and keyboard), applies it to the spider_root_ref. updates the spider_rig and camera
 export class SpiderController {
-    constructor(scene_ref, spider_movement_root_ref, spider_rig_ref, spider_camera_root_ref, camera_ref, dom_element = document.body, options = {}) {
+    constructor(scene_ref, spider_movement_root_ref, spider_rig_root_ref, spider_rig_obj_ref, spider_camera_root_ref, camera_ref, dom_element = document.body, options = {}) {
+        // #region reference copies
         this.scene_ref = scene_ref;
         this.spider_movement_root_ref = spider_movement_root_ref;
-        this.spider_rig_ref = spider_rig_ref;
+        this.spider_rig_root_ref = spider_rig_root_ref;
+        this.spider_rig_obj_ref = spider_rig_obj_ref;
         this.spider_camera_root_ref = spider_camera_root_ref;
         this.camera_ref = camera_ref;
-
         this.dom_element = dom_element;
+        // #endregion
 
         this.enabled = true;
 
-        this.move_speed = 10;
+        // #region cosmetic parameters
+        // TODO: precompute squared thresholds to avoid sqrt calls
+        // the max allowed distance between the raycaster hit point and the anchor point
+        this.limb_offset_thresholds = [[1.5, 2.0, 2.0, 1.7], [1.5, 2.0, 2.0, 1.7]];
+        if (options.limb_offset_thresholds) {
+            this.limb_offset_thresholds = options.limb_offset_thresholds;
+        }
+
+        this.time_to_reposition = 0.15; // seconds to reposition the limb
+        if (options.time_to_reposition) {
+            this.time_to_reposition = options.time_to_reposition;
+        }
+
+        this.max_time_unrested = 1.0; // seconds to wait before repositioning the limb
+        if (options.max_time_unrested) {
+            this.max_time_unrested = options.max_time_unrested;
+        }
+        // #endregion
+
+        // #region control parameters
+        this.move_speed = 5;
         this.sensitivity = 0.002;
 
-        this.default_speed = 10;
-        this.accel_speed = 20;
+        this.default_speed = 5;
+        this.accel_speed = 8;
+        // #endregion
 
+        // #region camera intenrals
         this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
         this.pitch = 0;
         this.yaw = 0;
 
         this.is_locked = false;
         this.drag_start = new THREE.Vector2();
+        // #endregion
 
+        // #region input states
         this.inputs = {
             forward: false,
             backward: false,
@@ -39,34 +66,41 @@ export class SpiderController {
             right: false,
             accel: false,
         };
+        this.last_movement_input_ts = 0;
+        // #endregion
 
         this.debug = false;
         if (options.debug) {
             this.debug = options.debug;
         }
 
+        // #region raycasting setup
         this.limb_count = 8;
         if (options.limb_count) {
             this.limb_count = options.limb_count;
         }
 
         const default_z_offset = 3;
-        const default_y_offset = -2;
+        const default_y_offset = 2;
 
         this.oy_angles = options.oy_angles || [Math.PI / 9 * 2, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
         this.raycaster_z_offsets = options.raycaster_z_offsets || [default_z_offset, default_z_offset, default_z_offset, default_z_offset];
         this.raycaster_y_offsets = options.raycaster_y_offsets || [default_y_offset, default_y_offset, default_y_offset, default_y_offset];
 
         // initialize raycaster positions
+        this.raycaster_origins_root = new THREE.Object3D();
+        this.raycaster_origins_root.name = 'raycaster_origins_root';
         this.raycaster_origins = [[], []];
         this.raycaster_directions = [[], []];
         this.raycaster_objects = [[], []];
+
+        this.spider_movement_root_ref.add(this.raycaster_origins_root);
 
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
                 const raycaster_origin = new THREE.Object3D();
 
-                this.spider_movement_root_ref.add(raycaster_origin);
+                this.raycaster_origins_root.add(raycaster_origin);
                 this.raycaster_origins[lr].push(raycaster_origin);
 
                 raycaster_origin.name = `target_raycaster_${lr}_${i}`;
@@ -134,6 +168,8 @@ export class SpiderController {
             }
         }
 
+        this.raycast_hit_points = [[], []]; // to store the hit points of the raycasters
+
         if (options.raycaster_origins) {
             this.raycaster_origins = options.raycaster_origins;
         }
@@ -142,10 +178,77 @@ export class SpiderController {
             this.raycasting_candidates = options.raycasting_candidates;
         }
 
+        // #endregion
+
+        this.doRaycasts();
+
+        this.spider_movement_root_ref.updateWorldMatrix(true, true);
+
+        // #region anchor setup
+        this.anchors = [[], []]; // anchors for the spider legs
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const anchor = new THREE.Vector3().copy(this.raycast_hit_points[lr][i]);
+                this.anchors[lr].push(anchor);
+            }
+        }
+
+        if (options.debug) {
+            this.anchor_visualizers = [[], []];
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    const anchor_visualizer = objutils.createSphere({
+                        radius: 0.1,
+                        color: colors.blue,
+                        opacity: 0.5,
+                    });
+                    anchor_visualizer.position.copy(this.anchors[lr][i]);
+                    this.scene_ref.add(anchor_visualizer);
+                    this.anchor_visualizers[lr].push(anchor_visualizer);
+                }
+            }
+        }
+        // #endregion
+
+        // #region update internals
+        this.velocity = new THREE.Vector3(0, 0, 0); // velocity of the spider movement root
+        // #endregion
+
+        // #region leg stepping
+        // TODO: get leg stepper parmaters from options
+        this.limb_steppers = [[], []]; // steppers for the spider legs
+        this.limb_reposition_flags = [[], []]; // flags to indicate if a limb needs to be repositioned
+        this.reposition_targets = [[], []]; // targets to reposition the limbs to
+        this.reposition_start_timestamps = [[], []]; // timestamps when the repositioning started
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                // TODO: replace control with the up vector of the spider movement root
+                this.limb_steppers[lr].push(new SpiderLegStepper(
+                    this.anchors[lr][i],
+                    this.raycast_hit_points[lr][i],
+                    new THREE.Vector3(0, 1, 0),
+                    this.time_to_reposition, // duration of the step in seconds
+                    {
+                        lift_amount: 0.5, // how much to lift the leg
+                        curve_bias: 0.7, // how much to curve the step
+                        ease_fn: (t) => t * (2 - t), // ease function for the step
+                    }
+                ));
+                this.limb_reposition_flags[lr].push(false); // initialize all flags to false
+                this.reposition_targets[lr].push(new THREE.Vector3()); // initialize all targets to a new vector
+                this.reposition_start_timestamps[lr].push(0); // initialize all timestamps to 0
+            }
+        }
+
+        this.look_rest = true;
+        this.move_rest = true;
+        // #endregion
+
+        // #region camera setup
         this.spider_camera_root_ref.add(this.camera_ref);
         // this.spider_root_ref.add(this.spider_camera_root_ref);
 
-        this.x_offset = 0;
+        this.x_offset = -1;
 
         if (options.offset) {
             this.camera_ref.position.copy(options.offset);
@@ -160,6 +263,8 @@ export class SpiderController {
         }
 
         this.lookAt(this.look_at_target); // default look at
+
+        // #endregion
 
         this._bindEvents();
     }
@@ -292,13 +397,25 @@ export class SpiderController {
         const dx = e.movementX || 0;
         const dy = e.movementY || 0;
 
+        this.look_rest = false;
+
+        if (this.look_rest_timeout) {
+            clearTimeout(this.look_rest_timeout);
+        }
+
+        // the mouse rest will be considered at rest after 100ms of no movement
+        this.look_rest_timeout = setTimeout(() => {
+            this.look_rest = true;
+        }, 10);
+
         // accumulate yaw / pitch
         this.yaw -= dx * this.sensitivity;
         this.pitch -= dy * this.sensitivity;
 
         // clamp pitch to avoid flipping
         const PI_2 = Math.PI / 2;
-        this.pitch = Math.max(-PI_2, Math.min(PI_2, this.pitch));
+        const off = 0.3;
+        this.pitch = Math.max(-PI_2 - off, Math.min(PI_2 - off, this.pitch));
 
         // after this step, we have the movement direction (yaw)
         this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
@@ -306,7 +423,6 @@ export class SpiderController {
     }
 
     doRaycasts() {
-        this.spider_movement_root_ref.updateWorldMatrix(true, false);
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
                 // retrieve the raycaster origin and direction
@@ -328,57 +444,137 @@ export class SpiderController {
 
                 let intersections = null;
                 if (this.raycasting_candidates) {
-                    intersections = raycaster_object.intersectObjects(this.raycasting_candidates, true);
+                    intersections = raycaster_object.intersectObjects(this.raycasting_candidates, false);
                 }
                 else {
                     intersections = raycaster_object.intersectObjects(this.scene_ref.children, true);
                 }
 
                 if (intersections.length > 0) {
+                    this.raycast_hit_points[lr][i] = intersections[0].point; // store the hit point
                     if (this.debug) {
                         // update the raycaster hit visualizer
                         this.raycaster_hit_visualizers[lr][i].position.copy(intersections[0].point);
                     }
                 }
+                // if no intersection, leave the hit point as it was in the last frame
             }
         }
     }
 
-    update(delta) {
+    update(delta, now) {
         if (!this.enabled);
 
-        const velocity = new THREE.Vector3(0, 0, 0);
+        this.velocity.set(0, 0, 0); // reset velocity
 
-        if (this.inputs.forward) velocity.z += 1;
-        if (this.inputs.backward) velocity.z -= 1;
-        if (this.inputs.left) velocity.x += 1;
-        if (this.inputs.right) velocity.x -= 1;
+        if (this.inputs.forward) this.velocity.z += 1;
+        if (this.inputs.backward) this.velocity.z -= 1;
+        if (this.inputs.left) this.velocity.x += 1;
+        if (this.inputs.right) this.velocity.x -= 1;
         if (this.inputs.accel) {
             this.move_speed = this.accel_speed;
         } else {
             this.move_speed = this.default_speed;
         }
+        if (this.velocity.x !== 0 || this.velocity.z !== 0) {
+            this.move_rest = false;
+            this.velocity.normalize().multiplyScalar(this.move_speed);
+        }
+        else {
+            this.move_rest = true;
+        }
 
-        velocity.normalize().multiplyScalar(this.move_speed * delta);
+        if (!this.look_rest || !this.move_rest) {
+            console.log(`movement input detected: look_rest = ${this.look_rest}, move_rest = ${this.move_rest}`);
+            this.last_movement_input_ts = now;
+        }
 
+        // offset the raycaster origins root by the velocity from its original position
+        this.raycaster_origins_root.position.copy(this.velocity.clone().multiplyScalar(0.2));
+
+        this.velocity.multiplyScalar(delta);
 
         // calculate the yaw rotation
         const spider_movement_euler = new THREE.Euler(0, this.yaw, 0, 'YXZ');
+        const spider_movement_quaternion = new THREE.Quaternion().setFromEuler(spider_movement_euler);
+
         // copy only yaw to spider movement root
         // NOTE: right now, we just copy (no lerp) later we can add a lerp to smooth the movement, or disable the copying at all if the user presses alt, for example
         // to pan around the spider freely without affecting the spider's rotation
-        this.spider_movement_root_ref.quaternion.setFromEuler(spider_movement_euler);
+        this.spider_movement_root_ref.quaternion.copy(spider_movement_quaternion);
 
         // rotate velocity so it matches the camera's look direction
-        velocity.applyQuaternion(this.spider_movement_root_ref.quaternion);
+        this.velocity.applyQuaternion(spider_movement_quaternion);
 
         // apply the velocity to the spider movement root
-        this.spider_movement_root_ref.position.add(velocity);
+        this.spider_movement_root_ref.position.add(this.velocity);
 
         // update the position of the camera so it follows the spider movement root
         this.spider_camera_root_ref.position.copy(this.spider_movement_root_ref.position);
 
         this.doRaycasts();
+
+        // get a new up direction for the spider movement root using the raycast hit points
+        // get a new center point for the spider movement root using the raycast hit points (average of all hit points + up vector * height from ground)
+
+        // copy the updated position, rotation to the spider rig
+        this.spider_rig_root_ref.position.copy(this.spider_movement_root_ref.position);
+        this.spider_rig_root_ref.quaternion.copy(this.spider_movement_root_ref.quaternion);
+
+        const time_since_last_movement = now - this.last_movement_input_ts;
+
+        // calculate the distance between every anchor and the raycaster hit point
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const anchor = this.anchors[lr][i];
+                const hit_point = this.raycast_hit_points[lr][i];
+
+                const distance = anchor.distanceTo(hit_point);
+
+                if (this.limb_reposition_flags[lr][i]) {
+                    // if the reposition flag is true, we should check if the stepper is done
+                    const stepper = this.limb_steppers[lr][i];
+                    const elapsed_time = now - this.reposition_start_timestamps[lr][i];
+
+                    if (elapsed_time >= stepper.duration) {
+                        // stepper is done, reset the reposition flag, snap the anchor to the hit point
+                        this.limb_reposition_flags[lr][i] = false;
+                        // this.anchors[lr][i].copy(stepper.to);
+                    }
+                    else {
+                        // update the stepper position
+                        stepper.getPositionInPlace(elapsed_time, this.anchors[lr][i]);
+                    }
+                }
+
+                const stretched = distance > this.limb_offset_thresholds[lr][i];
+                const unrested = (time_since_last_movement > this.max_time_unrested) && (distance > 0.01);
+
+                // console.log(`limb ${lr} ${i}: distance = ${distance.toFixed(2)}, stretched = ${stretched}, unrested = ${unrested}, time since last movement = ${(time_since_last_movement / 1000).toFixed(2)}s`);
+
+                // if the distance is greater than the threshold or the time since last movement is greater than the max time unrested
+                if ((stretched || unrested) && !this.limb_reposition_flags[lr][i]) {
+                    this.reposition_targets[lr][i].copy(hit_point);
+
+                    // start repositioning the limb
+                    this.limb_reposition_flags[lr][i] = true;
+                    this.reposition_start_timestamps[lr][i] = now;
+
+                    this.limb_steppers[lr][i].setFrom(this.anchors[lr][i]);
+                    this.limb_steppers[lr][i].setTo(hit_point);
+                    // TODO: replace the up vector with the spider movement root's up vector (world space)
+                    this.limb_steppers[lr][i].setUp(new THREE.Vector3(0, 1, 0)); // up vector for the stepper
+
+                    if (this.debug) {
+                        // update the anchor visualizer
+                        this.anchor_visualizers[lr][i].position.copy(hit_point);
+                    }
+                }
+            }
+        }
+
+        // retranslate the IK targets to the anchor positions
+        this.spider_rig_obj_ref.setTargetPositions(this.anchors);
     }
 
     dispose() {

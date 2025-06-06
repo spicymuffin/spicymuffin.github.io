@@ -13,6 +13,8 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { SpiderRig } from './SpiderRig.js';
 import { SpiderController } from './SpiderController.js';
 
+import { SpiderLegStepper } from './SpiderLegStepper.js';
+
 const gui = new GUI();
 gui.domElement.style.position = 'absolute';
 gui.domElement.style.right = '265px';
@@ -30,8 +32,20 @@ initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
 const ground_plane = objutils.createGroundPlane();
-ground_plane.position.y = -6;
+ground_plane.position.y = -4.5;
 scene.add(ground_plane);
+
+const ground_sphere = objutils.createSphere({
+    radius: 10,
+    color: colors.light_gray,
+});
+ground_sphere.position.set(-12, -12, 0);
+scene.add(ground_sphere);
+
+ground_plane.layers.enable(3);
+ground_sphere.layers.enable(3);
+
+
 const axis = new THREE.AxesHelper(10);
 axis.position.set(0, 0, 0);
 axis.raycast = () => { };
@@ -47,9 +61,6 @@ const Mode = Object.freeze({
 
 let mode = Mode.editor;
 let camera = editor_camera;
-
-// all walkable surfaces need to be on layer 3
-ground_plane.layers.enable(3);
 
 // spider locomomotion overview:
 // 1. user gives some inputs (wasd, mouse). the rotation defines the forward dirction, the wasd keys define the motion relative
@@ -94,12 +105,36 @@ const spider_rig_root = objutils.createSphere({
 
 scene.add(spider_rig_root);
 
-const spider_rig = new SpiderRig(spider_rig_root, {
-    position: new THREE.Vector3(0, -3, 0),
-    debug: true,
-});
+const spider = [spider_movement_root, spider_camera_root, spider_rig_root];
 
-const spider_controller = new SpiderController(scene, spider_movement_root, spider_rig, spider_camera_root, spider_camera, renderer.domElement, { debug: true });
+for (let i = 0; i < spider.length; i++) {
+    const spider_part = spider[i];
+    spider_part.position.set(0, -3.5, 0);
+}
+
+const spider_rig = new SpiderRig(spider_rig_root,
+    {
+        debug: true,
+    }
+);
+
+// render once to initialize the world....? idk the raycasters work during the first frame if we do this
+// hacky but VERY important for spidercontroller to initialize correctly
+renderer.render(scene, camera);
+
+const spider_controller = new SpiderController(
+    scene,
+    spider_movement_root,
+    spider_rig_root,
+    spider_rig,
+    spider_camera_root,
+    spider_camera,
+    renderer.domElement,
+    {
+        debug: true,
+        raycasting_candidates: [ground_plane, ground_sphere],
+    }
+);
 
 function switchMode() {
     // editor -> spider
@@ -135,6 +170,26 @@ function handleCameraSwitchKeydown(event) {
 
 document.addEventListener('keydown', handleCameraSwitchKeydown, false);
 
+let step = false;
+let start_ts = 0.0;
+const test_obj = objutils.createBox({
+    size: new THREE.Vector3(1.2, 1.2, 1.2),
+    color: colors.olive,
+    position: new THREE.Vector3(0, 0, 0),
+});
+scene.add(test_obj);
+const stepper = new SpiderLegStepper(
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(5, 2, 5),
+    new THREE.Vector3(0, 1, 0),
+    0.2,
+    {
+        lift_amount: 3,
+        curve_bias: 0.7,
+        ease_fn: (t) => t * (2 - t), // ease in-out
+    }
+);
+
 const actions = {
     runSolver: () => {
         // update the poles
@@ -148,7 +203,8 @@ const actions = {
     },
 
     action: () => {
-        spider_rig.updateIKChains();
+        step = !step;
+        start_ts = clock.getElapsedTime();
     },
 
     sc: () => {
@@ -165,13 +221,25 @@ gui.add(actions, 'sc').name('Switch Mode');
 function render() {
     requestAnimationFrame(render);
     const delta = clock.getDelta();
+    const now = clock.getElapsedTime();
 
     // update editor camera controls
     if (mode === Mode.editor) {
         editor_controller.update(delta);
     }
     else {
-        spider_controller.update(delta);
+        spider_controller.update(delta, now);
+    }
+
+    if (step) {
+        const elapsed_time = now - start_ts;
+        if (elapsed_time < stepper.duration) {
+            stepper.getPositionInPlace(elapsed_time, test_obj.position);
+        }
+        else {
+            step = false; // stop stepping after the duration
+            test_obj.position.copy(stepper.to);
+        }
     }
 
     // render the scene
