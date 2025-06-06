@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import * as objutils from './objutils.js';
+import * as colors from './colors.js';
+
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import Stats from 'three/addons/libs/stats.module.js';
 
@@ -43,10 +46,53 @@ export function initCanvasRenderer() {
 }
 
 export function initCamera(options = {}) {
-    const position = options.position || new THREE.Vector3(10, 10, 10);
+    function lookAt(target, camera) {
+        const up = new THREE.Vector3(0, 1, 0);
+        const targetPosition = new THREE.Vector3();
+        if (target instanceof THREE.Object3D) {
+            targetPosition.setFromMatrixPosition(target.matrixWorld);
+        } else if (target instanceof THREE.Vector3) {
+            targetPosition.copy(target);
+        } else {
+            alert("invalid target for lookAt");
+            return;
+        }
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
+        // compute forward vector (negative Z in camera space)
+        const zAxis = new THREE.Vector3().subVectors(camera.position, targetPosition).normalize();
+
+        // compute right vector
+        const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+
+        // recompute orthogonal up vector
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+        // build the rotation matrix
+        const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+
+        console.log("xAxis:", xAxis);
+        console.log("yAxis:", yAxis);
+        console.log("zAxis:", zAxis);
+
+        // apply rotation matrix to object
+        camera.quaternion.setFromRotationMatrix(rotMatrix);
+    }
+
+    const position = options.position || new THREE.Vector3(10, 10, 10);
+    const fov = options.fov || 45;
+    let look_at = null;
+    if (options.look_at !== undefined && options.look_at !== null) {
+        console.log("initCamera: look_at is set to", options.look_at);
+        look_at = options.look_at;
+    }
+
+    const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 100000);
+
     camera.position.copy(position);
+
+    if (look_at) {
+        lookAt(look_at, camera);
+    }
 
     return camera;
 }

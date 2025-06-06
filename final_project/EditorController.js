@@ -1,17 +1,26 @@
 import * as THREE from 'three';
 
-export class EditorCameraControls {
-    constructor(camera, domElement = document.body) {
+export class EditorController {
+    constructor(camera, dom_element = document.body, options = {}) {
         this.camera = camera;
-        this.domElement = domElement;
+        this.dom_element = dom_element;
 
         this.enabled = true;
 
-        this.moveSpeed = 10;
+        this.move_speed = 10;
         this.sensitivity = 0.002;
 
-        this.defaultSpeed = 10;
-        this.accelSpeed = 20;
+        this.default_speed = 10;
+        this.accel_speed = 20;
+
+        this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        this.pitch = 0;
+        this.yaw = 0;
+
+        this.camera.quaternion.setFromEuler(this.euler);
+
+        this.is_dragging = false;
+        this.drag_start = new THREE.Vector2();
 
         this.inputs = {
             forward: false,
@@ -21,17 +30,35 @@ export class EditorCameraControls {
             up: false,
             down: false,
             accel: false,
+            dx: 0,
+            dy: 0,
         };
 
-        this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
-
-        this.pitch = 0;
-        this.yaw = 0;
-
-        this.isDragging = false;
-        this.dragStart = new THREE.Vector2();
-
         this._bindEvents();
+
+        if (options.look_at) {
+            this.lookAt(options.look_at);
+        }
+    }
+
+    enable() {
+        this.enabled = true;
+    }
+
+    disable() {
+        this.enabled = false;
+        this.is_dragging = false;
+        document.exitPointerLock();
+    }
+
+    lockMouse() {
+        this.is_dragging = true;
+        this.dom_element.requestPointerLock();
+    }
+
+    unlockMouse() {
+        this.is_dragging = false;
+        document.exitPointerLock();
     }
 
     // accepts a target of type THREE.Object3D or THREE.Vector3
@@ -40,30 +67,30 @@ export class EditorCameraControls {
         this.camera.rotation.z = 0;
 
         const up = new THREE.Vector3(0, 1, 0);
-        const targetPosition = new THREE.Vector3();
+        const target_position = new THREE.Vector3();
         if (target instanceof THREE.Object3D) {
-            targetPosition.setFromMatrixPosition(target.matrixWorld);
+            target_position.setFromMatrixPosition(target.matrixWorld);
         } else if (target instanceof THREE.Vector3) {
-            targetPosition.copy(target);
+            target_position.copy(target);
         } else {
             alert("invalid target for lookAt");
             return;
         }
 
         // compute forward vector (negative Z in camera space)
-        const zAxis = new THREE.Vector3().subVectors(this.camera.position, targetPosition).normalize();
+        const z_axis = new THREE.Vector3().subVectors(this.camera.position, target_position).normalize();
 
         // compute right vector
-        const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+        const x_axis = new THREE.Vector3().crossVectors(up, z_axis).normalize();
 
         // recompute orthogonal up vector
-        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+        const y_axis = new THREE.Vector3().crossVectors(z_axis, x_axis).normalize();
 
         // build the rotation matrix
-        const rotMatrix = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+        const m = new THREE.Matrix4().makeBasis(x_axis, y_axis, z_axis);
 
         // apply rotation matrix to object
-        this.camera.quaternion.setFromRotationMatrix(rotMatrix);
+        this.camera.quaternion.setFromRotationMatrix(m);
         this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
         this.pitch = this.euler.x;
         this.yaw = this.euler.y;
@@ -77,15 +104,16 @@ export class EditorCameraControls {
         this._onMouseMove = this._onMouseMove.bind(this);
         this._onMouseScroll = this._onMouseScroll.bind(this);
 
+        this.dom_element.addEventListener('mousedown', this._onMouseDown);
+        this.dom_element.addEventListener('wheel', this._onMouseScroll);
         document.addEventListener('keydown', this._onKeyDown);
         document.addEventListener('keyup', this._onKeyUp);
-        this.domElement.addEventListener('mousedown', this._onMouseDown);
         document.addEventListener('mouseup', this._onMouseUp);
         document.addEventListener('mousemove', this._onMouseMove);
-        this.domElement.addEventListener('wheel', this._onMouseScroll);
     }
 
     _onKeyDown(e) {
+        if (!this.enabled) return;
         switch (e.code) {
             case 'KeyW': this.inputs.forward = true; break;
             case 'KeyS': this.inputs.backward = true; break;
@@ -98,6 +126,7 @@ export class EditorCameraControls {
     }
 
     _onKeyUp(e) {
+        if (!this.enabled) return;
         switch (e.code) {
             case 'KeyW': this.inputs.forward = false; break;
             case 'KeyS': this.inputs.backward = false; break;
@@ -110,37 +139,37 @@ export class EditorCameraControls {
     }
 
     _onMouseDown(e) {
+        if (!this.enabled) return;
         if (e.button === 2) { // right mouse button
-            this.isDragging = true;
-            this.domElement.requestPointerLock();
+            this.lockMouse();
         }
     }
 
     _onMouseUp(e) {
+        if (!this.enabled) return;
         if (e.button === 2) {
-            this.isDragging = false;
-            document.exitPointerLock();
+            this.unlockMouse();
         }
     }
 
     _onMouseScroll(e) {
         e.preventDefault();
         const delta = e.deltaY || e.detail || e.wheelDelta;
-        if (this.defaultSpeed + delta * -0.1 > 0.1) { this.defaultSpeed += delta * -0.1; }
-        this.accelSpeed = this.defaultSpeed * 2;
+        if (this.default_speed + delta * -0.1 > 0.1) { this.default_speed += delta * -0.1; }
+        this.accel_speed = this.default_speed * 2;
     }
 
     _onMouseMove(e) {
-        if (!this.enabled || !this.isDragging) return;
+        if (!this.enabled || !this.is_dragging) return;
 
         const dx = e.movementX || 0;
         const dy = e.movementY || 0;
 
-        /* accumulate yaw / pitch */
+        // accumulate yaw / pitch
         this.yaw -= dx * this.sensitivity;
         this.pitch -= dy * this.sensitivity;
 
-        /* clamp pitch to avoid flipping */
+        // clamp pitch to avoid flipping
         const PI_2 = Math.PI / 2;
         this.pitch = Math.max(-PI_2, Math.min(PI_2, this.pitch));
 
@@ -151,7 +180,7 @@ export class EditorCameraControls {
     update(delta) {
         if (!this.enabled) return;
 
-        const velocity = new THREE.Vector3();
+        const velocity = new THREE.Vector3(0, 0, 0);
 
         if (this.inputs.forward) velocity.z -= 1;
         if (this.inputs.backward) velocity.z += 1;
@@ -160,12 +189,12 @@ export class EditorCameraControls {
         if (this.inputs.up) velocity.y += 1;
         if (this.inputs.down) velocity.y -= 1;
         if (this.inputs.accel) {
-            this.moveSpeed = this.accelSpeed;
+            this.move_speed = this.accel_speed;
         } else {
-            this.moveSpeed = this.defaultSpeed;
+            this.move_speed = this.default_speed;
         }
 
-        velocity.normalize().multiplyScalar(this.moveSpeed * delta);
+        velocity.normalize().multiplyScalar(this.move_speed * delta);
 
         // move in local space
         this.camera.translateX(velocity.x);
@@ -174,11 +203,15 @@ export class EditorCameraControls {
     }
 
     dispose() {
+        this._unbindEvents();
+    }
+
+    _unbindEvents() {
+        this.dom_element.removeEventListener('mousedown', this._onMouseDown);
+        this.dom_element.removeEventListener('wheel', this._onMouseScroll);
         document.removeEventListener('keydown', this._onKeyDown);
         document.removeEventListener('keyup', this._onKeyUp);
-        this.domElement.removeEventListener('mousedown', this._onMouseDown);
         document.removeEventListener('mouseup', this._onMouseUp);
         document.removeEventListener('mousemove', this._onMouseMove);
-        document.removeEventListener('wheel', this._onMouseScroll);
     }
 }

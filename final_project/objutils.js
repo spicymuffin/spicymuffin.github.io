@@ -1,33 +1,5 @@
 import * as THREE from 'three';
 
-// preferrably pass a THREE.Vector3 for position
-// generates a box mesh that is uniformly scaled of size
-// options.size.x, options.size.y, options.size.z
-// with rotation and position
-export function createBox(options = {}) {
-    let size = options.size || new THREE.Vector3(1, 1, 1);
-    const originShift = options.originShift || new THREE.Vector3(0, 0, 0);
-
-    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
-
-    // shift the geometry to the center of the box
-    geometry.translate(-originShift.x, -originShift.y, -originShift.z);
-
-    // material for the mesh
-    const matColor = options.color || 0x00ff00;
-    const material = new THREE.MeshLambertMaterial({ color: matColor });
-
-    // generate the object3d (mesh, which is a subclass of object3d)
-    const cube = new THREE.Mesh(geometry, material);
-
-    let position = options.position || new THREE.Vector3(0, 0, 0);
-    cube.position.set(position.x, position.y, position.z);
-
-    const rotation = options.rotation || new THREE.Quaternion();
-    cube.quaternion.copy(rotation);
-    return cube;
-}
-
 // generates a sphere mesh with a given radius
 // options.size = radius (number)
 // options.position = THREE.Vector3
@@ -57,6 +29,110 @@ export function createSphere(options = {}) {
 
     return sphere;
 }
+
+export function createBox(options = {}) {
+    // geometry
+    const size = options.size || new THREE.Vector3(1, 1, 1);
+    const origin_shift = options.origin_shift || new THREE.Vector3(0, 0, 0);
+    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+    geometry.translate(-origin_shift.x, -origin_shift.y, -origin_shift.z);
+
+    // material
+    const opacity = options.opacity || 1.0;
+    const is_transparent = opacity < 1.0;
+    const mat_color = options.color || 0x00ff00;
+
+    const material = new THREE.MeshLambertMaterial({
+        color: mat_color,
+        transparent: is_transparent,
+        opacity: opacity
+    });
+
+    // mesh
+    const cube = new THREE.Mesh(geometry, material);
+
+    // transforms
+    const position = options.position || new THREE.Vector3(0, 0, 0);
+    cube.position.set(position.x, position.y, position.z);
+
+    const rotation = options.rotation || new THREE.Quaternion();
+    cube.quaternion.copy(rotation);
+
+    if (options.scale) {
+        cube.scale.copy(options.scale);
+    }
+
+    return cube;
+}
+
+export function createCone(options = {}) {
+    // primitive parameters
+    const radius = options.radius ?? 1;
+    const height = options.height ?? 2;
+    const radial_segments = options.radial_segments ?? options.radial_segments ?? 32;
+    const height_segments = options.height_segments ?? 1;
+    const open_ended = options.open_ended ?? false;
+    const theta_start = options.theta_start ?? 0;
+    const theta_length = options.theta_length ?? Math.PI * 2;
+
+    // geometry
+    const geometry = new THREE.ConeGeometry(
+        radius,
+        height,
+        radial_segments,
+        height_segments,
+        open_ended,
+        theta_start,
+        theta_length
+    );
+
+    const has_pointer = options.ptr_position instanceof THREE.Vector3 && options.ptr_direction instanceof THREE.Vector3;
+
+    if (has_pointer) {
+        geometry.translate(0, -height / 2, 0);
+        const direction = options.ptr_direction.clone().normalize();
+        const orient_quat = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            direction
+        );
+        geometry.applyQuaternion(orient_quat);
+    } else {
+        // legacy: base at origin, tip on +Y
+        geometry.translate(0, height / 2, 0);
+    }
+
+    // material
+    const opacity = options.opacity ?? 1.0;
+    const is_transparent = opacity < 1.0;
+    const mat_color = options.color ?? 0xff0000;
+
+    const material = options.material || new THREE.MeshStandardMaterial({
+        color: mat_color,
+        transparent: is_transparent,
+        opacity: opacity
+    });
+
+    // mesh
+    const mesh = new THREE.Mesh(geometry, material);
+
+    // transforms
+    if (has_pointer) {
+        mesh.position.copy(options.ptr_position);
+    } else if (options.position) {
+        mesh.position.copy(options.position);
+    }
+
+    if (options.rotation) {
+        mesh.quaternion.copy(options.rotation);
+    }
+
+    if (options.scale) {
+        mesh.scale.copy(options.scale);
+    }
+
+    return mesh;
+}
+
 
 // just use THREE.AxisHelper btw, dont use this, this sucks
 export function createArrows(options = {}) {

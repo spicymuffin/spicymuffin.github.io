@@ -3,7 +3,7 @@ import * as util from './util.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
-export class EditorControls {
+export class TransformManipulator {
     constructor(scene, camera, domElement, cameraControls = null, options = {}) {
         this.scene = scene;
         this.camera = camera;
@@ -43,6 +43,17 @@ export class EditorControls {
 
         domElement.addEventListener('pointerdown', this._onPointerDown);
         window.addEventListener('keydown', this._onKeyDown);
+    }
+
+    enable() {
+        this.enabled = true;
+        this.transform.enabled = true;
+    }
+
+    disable() {
+        this.enabled = false;
+        this.transform.enabled = false;
+        this.detach();
     }
 
     _onPointerDown(event) {
