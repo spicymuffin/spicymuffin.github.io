@@ -9,13 +9,12 @@ export const walkable_layer = 3; // layer for walkable surfaces
 
 // gets input (mouse and keyboard), applies it to the spider_root_ref. updates the spider_rig and camera
 export class SpiderController {
-    constructor(scene_ref, spider_movement_root_ref, spider_rig_root_ref, spider_rig_obj_ref, spider_camera_root_ref, camera_ref, dom_element = document.body, options = {}) {
+    constructor(scene_ref, spider_movement_root_ref, spider_rig_root_ref, spider_rig_obj_ref, camera_ref, dom_element = document.body, options = {}) {
         // #region reference copies
         this.scene_ref = scene_ref;
         this.spider_movement_root_ref = spider_movement_root_ref;
         this.spider_rig_root_ref = spider_rig_root_ref;
         this.spider_rig_obj_ref = spider_rig_obj_ref;
-        this.spider_camera_root_ref = spider_camera_root_ref;
         this.camera_ref = camera_ref;
         this.dom_element = dom_element;
         // #endregion
@@ -60,12 +59,28 @@ export class SpiderController {
         // #endregion
 
         // #region camera intenrals
-        this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        this.camera_rig = new THREE.Object3D();
+        this.camera_rig.name = 'camera_rig';
+        this.scene_ref.add(this.camera_rig);
+
+        this.camera_pitch_pivot = new THREE.Object3D();
+        this.camera_pitch_pivot.name = 'camera_pitch_pivot';
+        this.camera_rig.add(this.camera_pitch_pivot);
+        this.camera_pitch_pivot.add(this.camera_ref);
+
+        this.camera_rig.position.copy(this.spider_movement_root_ref.position);
+
         this.pitch = 0;
         this.yaw = 0;
-
         this.is_locked = false;
-        this.drag_start = new THREE.Vector2();
+
+        this.x_offset = 1;
+
+        if (options.offset) {
+            this.camera_ref.position.copy(options.offset);
+        } else {
+            this.camera_ref.position.set(this.x_offset, 0, 6); // Z is now positive because camera faces -Z
+        }
         // #endregion
 
         // #region input states
@@ -282,28 +297,6 @@ export class SpiderController {
         this.move_rest = true;
         // #endregion
 
-        // #region camera setup
-        this.spider_camera_root_ref.add(this.camera_ref);
-        // this.spider_root_ref.add(this.spider_camera_root_ref);
-
-        this.x_offset = 0;
-
-        if (options.offset) {
-            this.camera_ref.position.copy(options.offset);
-        }
-        else {
-            this.camera_ref.position.set(this.x_offset, 2, -6); // default offset
-        }
-
-        this.look_at_target = new THREE.Vector3(this.x_offset, 0, 0); // default look at target
-        if (options.offset) {
-            this.look_at_target.x = options.offset.x;
-        }
-
-        this.lookAt(this.look_at_target); // default look at
-
-        // #endregion
-
         this._bindEvents();
     }
 
@@ -319,7 +312,6 @@ export class SpiderController {
 
     enable() {
         this.enabled = true;
-        this.lookAt(this.look_at_target);
         this.lockMouse();
     }
 
@@ -358,9 +350,9 @@ export class SpiderController {
 
         // apply rotation matrix to object
         this.camera_ref.quaternion.setFromRotationMatrix(m);
-        this.euler.setFromQuaternion(this.camera_ref.quaternion, 'YXZ');
-        this.pitch = this.euler.x;
-        this.yaw = this.euler.y;
+        // this.euler.setFromQuaternion(this.camera_ref.quaternion, 'YXZ');
+        // this.pitch = this.euler.x;
+        // this.yaw = this.euler.y;
     }
 
     _bindEvents() {
@@ -448,16 +440,14 @@ export class SpiderController {
 
         // accumulate yaw / pitch
         this.yaw -= dx * this.sensitivity;
-        this.pitch -= dy * this.sensitivity;
+        this.pitch += dy * this.sensitivity;
 
         // clamp pitch to avoid flipping
         const PI_2 = Math.PI / 2;
-        const off = 0.3;
-        this.pitch = Math.max(-PI_2 - off, Math.min(PI_2 - off, this.pitch));
+        this.pitch = Math.max(-PI_2, Math.min(PI_2, this.pitch));
 
-        // after this step, we have the movement direction (yaw)
-        this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
-        this.spider_camera_root_ref.quaternion.setFromEuler(this.euler);
+        this.camera_rig.rotation.y = this.yaw;
+        this.camera_pitch_pivot.rotation.x = this.pitch;
     }
 
     doRaycasts() {
@@ -505,10 +495,10 @@ export class SpiderController {
 
         this.velocity.set(0, 0, 0); // reset velocity
 
-        if (this.inputs.forward) this.velocity.z += 1;
-        if (this.inputs.backward) this.velocity.z -= 1;
-        if (this.inputs.left) this.velocity.x += 1;
-        if (this.inputs.right) this.velocity.x -= 1;
+        if (this.inputs.forward) this.velocity.z -= 1;
+        if (this.inputs.backward) this.velocity.z += 1;
+        if (this.inputs.left) this.velocity.x -= 1;
+        if (this.inputs.right) this.velocity.x += 1;
         if (this.inputs.accel) {
             this.move_speed = this.accel_speed;
         } else {
@@ -527,49 +517,41 @@ export class SpiderController {
             this.last_movement_input_ts = now;
         }
 
-        // offset the raycaster origins root by the velocity from its original position
-        this.raycaster_origins_root.position.copy(this.velocity.clone().multiplyScalar(0.2));
-
-        // calculate the yaw rotation
-        const spider_movement_euler = new THREE.Euler(0, this.yaw, 0, 'YXZ');
-        const spider_movement_quaternion = new THREE.Quaternion().setFromEuler(spider_movement_euler);
-
-        // copy only yaw to spider movement root
-        // NOTE: right now, we just copy (no lerp) later we can add a lerp to smooth the movement, or disable the copying at all if the user presses alt, for example
-        // to pan around the spider freely without affecting the spider's rotation
-
-        const camera_interpolation_factor = Math.min(this.turn_speed * delta, 1.0); // clamp at 1.0 to prevent overshooting
-        this.spider_movement_root_ref.quaternion.slerp(spider_movement_quaternion, camera_interpolation_factor);
-
-        // this.temp_velocity = this.velocity.clone().applyQuaternion(this.spider_movement_root_ref.quaternion).multiplyScalar(-0.2); // store the velocity for later use
-        // rotate velocity so it matches the camera's look direction
-        this.velocity.applyQuaternion(spider_movement_quaternion);
-
-        this.velocity.multiplyScalar(delta);
-
         // apply the velocity to the spider movement root
-        this.spider_movement_root_ref.position.add(this.velocity);
+        const yaw_quaternion = new THREE.Quaternion().setFromEuler(this.camera_rig.rotation);
+        const world_velocity = this.velocity.clone().applyQuaternion(yaw_quaternion);
+        this.spider_movement_root_ref.position.add(world_velocity.multiplyScalar(delta));
 
-        // update the position of the camera so it follows the spider movement root
-        this.spider_camera_root_ref.position.copy(this.spider_movement_root_ref.position);
+        // handle the predictive step targets
+        const predictive_velocity = this.velocity.clone().multiplyScalar(-0.2);
+        this.raycaster_origins_root.position.copy(predictive_velocity);
 
+        // update the raycasters
         this.doRaycasts();
 
-        // get a new up direction for the spider movement root using the raycast hit points
-        // get a new center point for the spider movement root using the raycast hit points (average of all hit points + up vector * height from ground)
-
-        // calculate the average position from raycast hit points
         const avg_position = new THREE.Vector3();
+        // #region calculate average position
+        // calculate the average position from raycast hit points
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
                 avg_position.add(this.raycast_hit_points[lr][i]);
             }
         }
-        avg_position.divideScalar(this.limb_count); // average the position
+        avg_position.divideScalar(this.limb_count);
 
-        // calculate the up vector using two cross products from the grounded group of limbs
+        // translate the average position to local coordinates of the spider movement root
+        this.spider_movement_root_ref.worldToLocal(avg_position);
+        // reset x and z to 0
+        avg_position.x = 0;
+        avg_position.z = 0;
+        // translate the average position to world coordinates of the spider movement root
+        this.spider_movement_root_ref.localToWorld(avg_position);
+        // #endregion
+
         const grounded_group = 1 - this.current_moving_group;
         let up_vector = new THREE.Vector3(0, 1, 0); // default up vector
+        // #region calculate the up vector
+        // calculate the up vector using two cross products from the grounded group of limbs
 
         // hard coded, change later
         if (grounded_group === 0) {
@@ -590,16 +572,9 @@ export class SpiderController {
             up_vector.crossVectors(front.sub(back), left.sub(right));
             up_vector.normalize();
         }
+        // #endregion
 
-        // translate the average position to local coordinates of the spider movement root
-        this.spider_movement_root_ref.worldToLocal(avg_position);
-        // reset x and z to 0
-        avg_position.x = 0;
-        avg_position.z = 0;
-        // raise the average position by the ride height
-        avg_position.y += this.ride_height;
-        // translate the average position to world coordinates of the spider movement root
-        this.spider_movement_root_ref.localToWorld(avg_position);
+        const target_position = avg_position.clone().addScaledVector(up_vector, this.ride_height);
 
         if (this.debug) {
             // update the average position visualizer
@@ -609,19 +584,30 @@ export class SpiderController {
             this.up_vector_visualizer.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), up_vector);
         }
 
-        // slerp the body's position towards the average position
-        const position_interpolation_factor = Math.min(4 * delta, 1.0); // clamp at 1.0 to prevent overshooting
-        this.spider_movement_root_ref.position.lerp(avg_position, position_interpolation_factor);
+        // construct the final target rotation for the body
 
-        // slerp the body's quaternion towards the up vector
-        const up_quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), up_vector);
-        const rotation_interpolation_factor = Math.min(2 * delta, 1.0); // clamp at 1.0 to prevent overshooting
-        // this.spider_movement_root_ref.quaternion.slerp(up_quaternion, rotation_interpolation_factor);
+        const camera_forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yaw_quaternion);
 
-        // slerp the camera's rotation too
-        // this.spider_camera_root_ref.quaternion.slerp(this.spider_movement_root_ref.quaternion, rotation_interpolation_factor);
+        // project this forward vector onto the spider's ground plane.
+        const right_direction = new THREE.Vector3().crossVectors(up_vector, camera_forward).normalize();
+        const projected_forward = new THREE.Vector3().crossVectors(right_direction, up_vector).normalize();
 
-        // copy the updated position, rotation to the spider rig
+        // create a rotation matrix from the basis
+        const target_rotation_matrix = new THREE.Matrix4().makeBasis(right_direction, up_vector, projected_forward);
+        const target_body_quaternion = new THREE.Quaternion().setFromRotationMatrix(target_rotation_matrix);
+
+        // smoothly move and rotate the spider body
+        const position_interpolation_factor = Math.min(8 * delta, 1.0);
+        this.spider_movement_root_ref.position.lerp(target_position, position_interpolation_factor);
+
+        const rotation_interpolation_factor = Math.min(6 * delta, 1.0);
+        this.spider_movement_root_ref.quaternion.slerp(target_body_quaternion, rotation_interpolation_factor);
+
+        // smoothly move the camera rig to follow the spider
+        const follow_interpolation_factor = Math.min(2 * delta, 1.0);
+        this.camera_rig.position.copy(this.spider_movement_root_ref.position);
+
+        // update the spider rig's position to match the spider movement root
         this.spider_rig_root_ref.position.copy(this.spider_movement_root_ref.position);
         this.spider_rig_root_ref.quaternion.copy(this.spider_movement_root_ref.quaternion);
 
