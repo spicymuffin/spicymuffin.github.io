@@ -471,6 +471,41 @@ export class SpiderController {
         }
     }
 
+    getAdjacentLegs(lr, i) {
+        let l_lr = lr;
+        let l_idx = i;
+        let r_lr = lr;
+        let r_idx = i;
+
+        // shift idxs to the corrrect direction based on lr
+        if (lr == 0) {
+            l_idx++;
+            r_idx--;
+        }
+        else {
+            l_idx--;
+            r_idx++;
+        }
+
+        // if the leg is at a lr boundart, we need to invert lr
+        if (l_idx < 0 || l_idx >= this.limb_count / 2) {
+            l_lr = 1 - lr; // invert the lr
+            l_idx = Math.max(0, Math.min(this.limb_count / 2 - 1, l_idx)); // clamp the index
+        }
+
+        if (r_idx < 0 || r_idx >= this.limb_count / 2) {
+            r_lr = 1 - lr; // invert the lr
+            r_idx = Math.max(0, Math.min(this.limb_count / 2 - 1, r_idx)); // clamp the index
+        }
+
+        return {
+            l_lr,
+            l_idx,
+            r_lr,
+            r_idx,
+        }
+    }
+
     update(delta, now) {
         if (!this.enabled);
 
@@ -557,10 +592,10 @@ export class SpiderController {
                     // only check legs belonging to the next potential group
                     if (this.leg_groups[lr][i] === next_group_to_move) {
                         const distance = this.anchors[lr][i].distanceTo(this.raycast_hit_points[lr][i]);
-                        const stretched = distance > this.limb_offset_thresholds[lr][i];
-                        const unrested = (time_since_last_movement > this.max_time_unrested) && (distance > 0.01);
+                        const unrested_mult = time_since_last_movement > this.max_time_unrested ? 0.2 : 1.0; // if unrested, shrink the threshold to 10% of the original
+                        const stretched = distance > this.limb_offset_thresholds[lr][i] * unrested_mult;
 
-                        if (stretched || unrested) {
+                        if (stretched) {
                             trigger_new_step = true;
                             break;
                         }
@@ -603,11 +638,11 @@ export class SpiderController {
 
                 if (should_this_leg_move_now) {
                     const distance = anchor.distanceTo(hit_point);
-                    const stretched = distance > this.limb_offset_thresholds[lr][i];
-                    const unrested = (time_since_last_movement > this.max_time_unrested) && (distance > 0.01);
+                    const unrested_mult = time_since_last_movement > this.max_time_unrested ? 0.2 : 1.0; // if unrested, shrink the threshold to 10% of the original
+                    const stretched = distance > this.limb_offset_thresholds[lr][i] * unrested_mult;
 
                     // only move the legs in the group that are actually stretched or unrested
-                    if (stretched || unrested) {
+                    if (stretched) {
                         // start repositioning the limb
                         this.limb_reposition_flags[lr][i] = true;
                         this.reposition_start_timestamps[lr][i] = now;
