@@ -31,20 +31,125 @@ const cameraHelper = new THREE.CameraHelper(spider_camera);
 initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
-const ground_plane = objutils.createGroundPlane();
-ground_plane.position.y = -4.5;
-scene.add(ground_plane);
+const ground_plane1 = objutils.createGroundPlane();
+ground_plane1.position.y = -4.5;
+scene.add(ground_plane1);
+
+const ground_plane2 = objutils.createGroundPlane();
+ground_plane2.rotation.x = -Math.PI / 4; // rotate it to be at an angle
+ground_plane2.position.set(0, -4.5, -25);
+scene.add(ground_plane2);
+
+const ground_plane3 = objutils.createGroundPlane();
+ground_plane3.rotation.x = 0; // rotate it to be at an angle
+ground_plane3.position.set(0, 10, -30);
+scene.add(ground_plane3);
+
+const ground_plane4 = objutils.createGroundPlane();
+ground_plane4.rotation.x = Math.PI / 4; // rotate it to be at an angle
+ground_plane4.position.set(0, 10, -25);
+scene.add(ground_plane4);
+
+const ground_plane5 = objutils.createGroundPlane();
+ground_plane5.rotation.x = Math.PI / 2; // rotate it to be at an angle
+ground_plane5.position.set(0, 10, 0);
+scene.add(ground_plane5);
 
 const ground_sphere = objutils.createSphere({
     radius: 10,
     color: colors.light_gray,
 });
-ground_sphere.position.set(-12, -12, 0);
+ground_sphere.position.set(-30, -12, 0);
 scene.add(ground_sphere);
 
-ground_plane.layers.enable(3);
+ground_plane1.layers.enable(3);
+ground_plane2.layers.enable(3);
+ground_plane3.layers.enable(3);
+ground_plane4.layers.enable(3);
+ground_plane5.layers.enable(3);
 ground_sphere.layers.enable(3);
 
+let walkables = [];
+walkables.push(ground_plane1);
+walkables.push(ground_plane2);
+walkables.push(ground_plane3);
+walkables.push(ground_plane4);
+walkables.push(ground_plane5);
+walkables.push(ground_sphere);
+
+// Additional objects for IK testing
+const cube1 = objutils.createBox({
+    size: new THREE.Vector3(2, 2, 2),
+    color: colors.blue,
+});
+cube1.position.set(5, -3.5, 5);
+scene.add(cube1);
+
+
+const cube2 = objutils.createBox({
+    size: new THREE.Vector3(1.5, 4, 1.5),
+    color: colors.green,
+});
+cube2.position.set(-5, -2.5, 5);
+scene.add(cube2);
+
+const cube3 = objutils.createBox({
+    size: new THREE.Vector3(3, 1, 3),
+    color: colors.red,
+});
+cube3.position.set(0, -3, 10);
+scene.add(cube3);
+walkables.push(cube1);
+walkables.push(cube2);
+walkables.push(cube3);
+
+// Create a staircase structure
+for (let i = 0; i < 5; i++) {
+    const step = objutils.createBox({
+        size: new THREE.Vector3(2, 0.5, 2),
+        color: colors.yellow,
+    });
+    step.position.set(-8, -4 + (i * 0.5), -5 + (i * 2));
+    scene.add(step);
+    step.layers.enable(3);
+    walkables.push(step);
+}
+
+// Create a ramp
+const ramp = objutils.createBox({
+    size: new THREE.Vector3(3, 0.5, 8),
+    color: colors.purple,
+});
+ramp.position.set(8, -3, -5);
+ramp.rotation.x = Math.PI / 8;
+scene.add(ramp);
+walkables.push(ramp);
+
+// Create a platform
+const platform = objutils.createBox({
+    size: new THREE.Vector3(5, 0.5, 5),
+    color: colors.orange,
+});
+platform.position.set(3, -2, -10);
+scene.add(platform);
+walkables.push(platform);
+
+// Add a smaller sphere
+const smallSphere = objutils.createSphere({
+    radius: 1.5,
+    color: colors.pink,
+});
+smallSphere.position.set(7, -3, 0);
+scene.add(smallSphere);
+walkables.push(smallSphere);
+
+// Enable layer 3 for all new objects
+cube1.layers.enable(3);
+cube2.layers.enable(3);
+cube3.layers.enable(3);
+ramp.layers.enable(3);
+platform.layers.enable(3);
+smallSphere.layers.enable(3);
 
 const axis = new THREE.AxesHelper(10);
 axis.position.set(0, 0, 0);
@@ -85,16 +190,6 @@ const spider_movement_root = objutils.createBox({
 
 scene.add(spider_movement_root);
 
-const spider_camera_root = objutils.createSphere({
-    radius: 0.2,
-    color: colors.green,
-    transparent: true,
-    opacity: 0.4,
-    name: 'spider_camera_root',
-});
-
-scene.add(spider_camera_root);
-
 const spider_rig_root = objutils.createSphere({
     radius: 0.5,
     color: colors.red,
@@ -105,7 +200,7 @@ const spider_rig_root = objutils.createSphere({
 
 scene.add(spider_rig_root);
 
-const spider = [spider_movement_root, spider_camera_root, spider_rig_root];
+const spider = [spider_movement_root, spider_rig_root];
 
 for (let i = 0; i < spider.length; i++) {
     const spider_part = spider[i];
@@ -127,12 +222,11 @@ const spider_controller = new SpiderController(
     spider_movement_root,
     spider_rig_root,
     spider_rig,
-    spider_camera_root,
     spider_camera,
     renderer.domElement,
     {
         debug: true,
-        raycasting_candidates: [ground_plane, ground_sphere],
+        raycasting_candidates: walkables,
     }
 );
 

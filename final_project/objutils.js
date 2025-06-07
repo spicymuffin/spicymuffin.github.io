@@ -27,6 +27,10 @@ export function createSphere(options = {}) {
     const rotation = options.rotation || new THREE.Quaternion();
     sphere.quaternion.copy(rotation);
 
+    if (options.name) {
+        sphere.name = options.name;
+    }
+
     return sphere;
 }
 
@@ -60,6 +64,10 @@ export function createBox(options = {}) {
 
     if (options.scale) {
         cube.scale.copy(options.scale);
+    }
+
+    if (options.name) {
+        cube.name = options.name;
     }
 
     return cube;
@@ -128,6 +136,10 @@ export function createCone(options = {}) {
 
     if (options.scale) {
         mesh.scale.copy(options.scale);
+    }
+
+    if (options.name) {
+        mesh.name = options.name;
     }
 
     return mesh;
@@ -215,7 +227,7 @@ export function createVector(options = {}) {
 
 export function createGroundPlane() {
     // create the ground plane
-    const planeGeometry = new THREE.PlaneGeometry(50, 50, 120, 120);
+    const planeGeometry = new THREE.PlaneGeometry(50, 50, 1, 1);
     const planeMaterial = new THREE.MeshPhongMaterial({
         color: 0xffffff
     });
