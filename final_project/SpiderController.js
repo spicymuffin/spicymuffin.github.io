@@ -24,14 +24,29 @@ export class SpiderController {
         // #region cosmetic parameters
         // TODO: precompute squared thresholds to avoid sqrt calls
         // the max allowed distance between the raycaster hit point and the anchor point
-        this.limb_offset_thresholds = [[1.5, 1.0, 1.0, 1.2], [1.5, 1.0, 1.0, 1.2]];
+        this.limb_offset_thresholds = [[1.5, 1.0, 1.0, 1.0], [1.5, 1.0, 1.0, 1.0]];
         if (options.limb_offset_thresholds) {
             this.limb_offset_thresholds = options.limb_offset_thresholds;
         }
 
-        this.time_to_reposition = 0.15; // seconds to reposition the limb
+        this.time_to_reposition = 0.20; // seconds to reposition the limb
         if (options.time_to_reposition) {
             this.time_to_reposition = options.time_to_reposition;
+        }
+
+        this.lift_amount = 0.7; // how much to lift the leg when repositioning
+        if (options.lift_amount) {
+            this.lift_amount = options.lift_amount;
+        }
+
+        this.curve_bias = 0.7; // how much to curve the step
+        if (options.curve_bias) {
+            this.curve_bias = options.curve_bias;
+        }
+
+        this.ease_fn = (t) => t * (2 - t); // ease function for the step
+        if (options.ease_fn) {
+            this.ease_fn = options.ease_fn;
         }
 
         this.max_time_unrested = 0.4; // seconds to wait before repositioning the limb
@@ -46,21 +61,27 @@ export class SpiderController {
         // #endregion
 
         // #region control parameters
-        this.move_speed = 5;
+        this.move_speed = 3;
         this.sensitivity = 0.002;
 
-        this.default_speed = 5;
+        this.default_speed = 3;
         this.accel_speed = 8;
 
-        this.turn_speed = 2.0;
+        this.turn_speed = 5.0;
         if (options.turn_speed) {
             this.turn_speed = options.turn_speed;
         }
         // #endregion
 
         // #region camera intenrals
-        this.camera_follow_speed = 20.0; // how fast the camera's position follows the spider
+        this.camera_follow_speed = 10.0; // how fast the camera's position follows the spider
         this.camera_rotation_speed = 5.0; // how fast the camera's orientation follows the spider's roll/pitch
+
+        // camera zoom properties
+        this.camera_distance = 6.0; // default camera distance
+        this.min_camera_distance = 2.0; // minimum zoom distance
+        this.max_camera_distance = 50.0; // maximum zoom distance
+        this.zoom_speed = 0.5; // how fast zoom changes with scroll
 
         this.camera_rig = new THREE.Object3D();
         this.camera_rig.name = 'camera_rig';
@@ -291,9 +312,9 @@ export class SpiderController {
                     new THREE.Vector3(0, 1, 0),
                     this.time_to_reposition, // duration of the step in seconds
                     {
-                        lift_amount: 0.5, // how much to lift the leg
-                        curve_bias: 0.7, // how much to curve the step
-                        ease_fn: (t) => t * (2 - t), // ease function for the step
+                        lift_amount: this.lift_amount, // how much to lift the leg
+                        curve_bias: this.curve_bias, // how much to curve the step
+                        ease_fn: this.ease_fn, // ease function for the step
                     }
                 ));
                 this.limb_reposition_flags[lr].push(false); // initialize all flags to false
@@ -426,8 +447,12 @@ export class SpiderController {
     _onMouseScroll(e) {
         e.preventDefault();
         const delta = e.deltaY || e.detail || e.wheelDelta;
-        if (this.default_speed + delta * -0.1 > 0.1) { this.default_speed += delta * -0.1; }
-        this.accel_speed = this.default_speed * 2;
+
+        // delta is positive when scrolling down (zoom out), negative when scrolling up (zoom in)
+        const zoom_delta = delta * 0.01 * this.zoom_speed;
+        this.camera_distance = Math.max(this.min_camera_distance,
+            Math.min(this.max_camera_distance,
+                this.camera_distance + zoom_delta));
     }
 
     _onMouseMove(e) {
@@ -590,7 +615,7 @@ export class SpiderController {
 
         const target_body_position = avg_position.clone().addScaledVector(up_vector, this.ride_height);
 
-        const target_forward = new THREE.Vector3(0, 0, 1).applyQuaternion(cam_yaw_quat);
+        const target_forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera_rig.quaternion);
         const target_right = new THREE.Vector3().crossVectors(up_vector, target_forward).normalize();
         const projected_forward = new THREE.Vector3().crossVectors(target_right, up_vector).normalize();
 
@@ -624,6 +649,9 @@ export class SpiderController {
         this.camera_rig.quaternion.slerp(target_camera_quaternion, cam_rot_interp);
 
         this.camera_pitch_pivot.rotation.x = this.pitch;
+
+        // apply camera zoom by updating the camera's local Z position
+        this.camera_ref.position.z = this.camera_distance;
 
         const time_since_last_movement = now - this.last_movement_input_ts;
 
@@ -714,7 +742,7 @@ export class SpiderController {
                         stepper.setFrom(this.anchors[lr][i]);
                         stepper.setTo(hit_point);
                         // TODO: replace the up vector with the spider movement root's up vector (world space)
-                        stepper.setUp(new THREE.Vector3(0, 1, 0)); // up vector for the stepper
+                        stepper.setUp(up_vector); // up vector for the stepper
 
                         if (this.debug) {
                             // update the anchor visualizer target position
