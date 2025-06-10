@@ -277,6 +277,7 @@ const stepper = new SpiderLegStepper(
     new THREE.Vector3(5, 2, 5),
     new THREE.Vector3(0, 1, 0),
     0.2,
+    spider_camera,
     {
         lift_amount: 3,
         curve_bias: 0.7,

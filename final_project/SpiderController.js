@@ -311,6 +311,7 @@ export class SpiderController {
                     this.raycast_hit_points[lr][i],
                     new THREE.Vector3(0, 1, 0),
                     this.time_to_reposition, // duration of the step in seconds
+                    this.camera_ref,
                     {
                         lift_amount: this.lift_amount, // how much to lift the leg
                         curve_bias: this.curve_bias, // how much to curve the step
