@@ -20,9 +20,9 @@ export class SpiderLegStepper {
 
         this.footstepSound = new THREE.Audio(this.listener);
         this.audioLoader = new THREE.AudioLoader();
-        this.audioLoader.load('sounds/spider-step.mp3', (buffer) => {
+        this.audioLoader.load('assets/sounds/spider-step.mp3', (buffer) => {
             this.footstepSound.setBuffer(buffer);
-            this.footstepSound.setVolume(1);
+            this.footstepSound.setVolume(0.4);
         });
         // camera section end
     }
