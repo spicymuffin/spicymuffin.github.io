@@ -167,6 +167,7 @@ export class SpiderRig {
 
                 this.parent_ref.add(target);
                 this.targets[lr].push(target);
+                target.visible = false;
             }
         }
 
@@ -193,6 +194,7 @@ export class SpiderRig {
 
                 this.parent_ref.add(pole);
                 this.poles[lr].push(pole);
+                pole.visible = false;
             }
         }
 
@@ -207,7 +209,8 @@ export class SpiderRig {
                     {}, // constraints
                     {
                         pole: this.poles[lr][i],
-                        debug: true
+                        debug: true,
+                        customMeshes: options.customMeshes,
                     } // options
                 );
 
