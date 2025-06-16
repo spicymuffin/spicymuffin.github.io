@@ -168,7 +168,7 @@ robot_arm.scene.traverse((child) => {
 const spider_rig = new SpiderRig(spider_rig_root,
     {
         debug: false,
-        customMeshes: [sharedMesh]
+        sharedMesh: sharedMesh
     }
 );
 

@@ -9,7 +9,6 @@ export class IKChain {
     constructor(end_effector_bone_ref, chain_len, space_ref, constraints = {}, options = {}) {
         this.chain_len = chain_len;
         this.debug = options.debug || false;
-        this.customMeshes = options.customMeshes || [];
         if (this.debug) {
             this.bone_visualizers = [];
         }
@@ -116,31 +115,19 @@ export class IKChain {
                 const axis = new THREE.AxesHelper(0.6);
                 axis.raycast = () => { };
                 sphere.add(axis);
-                sphere.visible = false;
 
                 // add a box to visualize the bone
-            if (this.customMeshes[0]) {
-                const mesh = this.customMeshes[0].clone();
+                if (i > 0) {
+                    const bonevis_thickness = 0.02;
+                    const bonevis_length = this.bone_lengths[i - 1];
 
-                mesh.position.set(0, 0, 0);
-                mesh.rotation.set(0, 0, 0);
-                mesh.lookAt(0, 1, 0);
-                mesh.scale.set(2.5, 2.5, 2.5);
+                    const bone = objutils.createBox({
+                        size: new THREE.Vector3(bonevis_thickness, bonevis_length, bonevis_thickness),
+                        color: 0xffffff,
+                        origin_shift: new THREE.Vector3(0, -0.5 * bonevis_length, 0)
+                    });
 
-                const offset = 0.5 * (this.bone_lengths[i - 1] || 0);
-                mesh.position.y = offset;
-
-                this.bone_proxies[i].add(mesh); 
-
-            } else if (i > 0) {
-                const bonevis_thickness = 0.02;
-                const bonevis_length = this.bone_lengths[i - 1];
-                const bone = objutils.createBox({
-                    size: new THREE.Vector3(bonevis_thickness, bonevis_length, bonevis_thickness),
-                    color: 0xffffff,
-                    origin_shift: new THREE.Vector3(0, -0.5 * bonevis_length, 0)
-                });
-                sphere.add(bone);
+                    sphere.add(bone);
                 }
             }
         }

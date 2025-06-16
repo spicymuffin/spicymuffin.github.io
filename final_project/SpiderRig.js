@@ -15,8 +15,7 @@ function degToRad(degrees) {
 export class SpiderRig {
     constructor(parent_ref, options = {}) {
         this.parent_ref = parent_ref;
-
-        this.debug = options.debug ?? true;
+        this.debug = options.debug ?? false;
 
         // create the rig
         // no ascii art, consult an image that hopefully someone has drawn...
@@ -83,6 +82,30 @@ export class SpiderRig {
 
                     this.bone_levels[level - 1][lr][i].add(bone);
                     this.bone_levels[level][lr].push(bone);
+
+                    if (options.sharedMesh) {
+                        const mesh = options.sharedMesh.clone();
+
+                        mesh.lookAt(0, 1, 0);
+                        mesh.scale.set(5, 3, 2.5);
+
+                        switch(level){
+                            case 1:
+                                mesh.position.set(0, 0.5, 0);
+                                break;
+                            case 2:
+                                mesh.scale.set(5, 2.5, 2);
+                                mesh.rotateX(Math.PI / 4);
+                                break;
+                            case 3:
+                                break;
+                            case 4:
+                                mesh.position.set(0, -0.5, 0);
+                                //mesh.scale.set(5, 2.5, 2.5);
+                                break;
+                        }
+                        bone.add(mesh);
+                    }
                 }
             }
         }
@@ -209,8 +232,7 @@ export class SpiderRig {
                     {}, // constraints
                     {
                         pole: this.poles[lr][i],
-                        debug: true,
-                        customMeshes: options.customMeshes,
+                        debug: false,
                     } // options
                 );
 
