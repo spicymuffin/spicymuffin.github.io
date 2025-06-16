@@ -97,11 +97,8 @@ export class SpiderRig {
                                 mesh.scale.set(5, 2.5, 2);
                                 mesh.rotateX(Math.PI / 4);
                                 break;
-                            case 3:
-                                break;
                             case 4:
                                 mesh.position.set(0, -0.5, 0);
-                                //mesh.scale.set(5, 2.5, 2.5);
                                 break;
                         }
                         bone.add(mesh);
@@ -172,11 +169,7 @@ export class SpiderRig {
         this.targets = [[], []];
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
-                const target = objutils.createSphere({
-                    radius: 0.25,
-                    color: colors.red,
-                    opacity: 0.5,
-                });
+                const target = new THREE.Object3D();
 
                 target.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_target`;
 
@@ -190,7 +183,6 @@ export class SpiderRig {
 
                 this.parent_ref.add(target);
                 this.targets[lr].push(target);
-                target.visible = false;
             }
         }
 
@@ -198,11 +190,7 @@ export class SpiderRig {
         this.poles = [[], []];
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
-                const pole = objutils.createSphere({
-                    radius: 0.1,
-                    color: colors.yellow,
-                    opacity: 0.5,
-                });
+                const pole = new THREE.Object3D();
 
                 pole.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_pole`;
 
@@ -217,7 +205,6 @@ export class SpiderRig {
 
                 this.parent_ref.add(pole);
                 this.poles[lr].push(pole);
-                pole.visible = false;
             }
         }
 
