@@ -92,6 +92,14 @@ loader.load('blender/background.glb', (gltf) => {
                 obj.material.emissiveIntensity = 0.3;
                 obj.material.alphaTest = 1.0;
             }
+            if (obj.name == "Biig_LP_BigMushrooms_0") {
+                const biiiig = obj.clone();
+                biiiig.position.set(-141.5176143422687, -10.922487402934419, -28.092259821048195);
+                biiiig.scale.set(27.022086805646087, 27.022086805646087, 27.022086805646087);
+                scene.add(biiiig);
+                biiiig.layers.enable(3);
+                raycasting_candidates.push(biiiig);
+            }
         }
     });
 
@@ -256,7 +264,7 @@ const debug_params = {
     raycastHits: false,
     ikTargets: false,
     ikPoles: false,
-    ikProxies: false,
+    ikProxies: true,
     bones: true,
     raycastOrigins: false,
     repositionTarget: false,
@@ -272,6 +280,7 @@ debugFolder.add(debug_params, 'ikProxies').name('IK Proxies').onChange(v => spid
 debugFolder.add(debug_params, 'bones').name('Bones').onChange(v => spider_rig.setDebugBonesVisible(v));
 debugFolder.add(debug_params, 'raycastOrigins').name('Raycast Origins').onChange(v => { spider_controller.setDebugRaycastOriginsVisible(v); });
 debugFolder.add(debug_params, 'repositionTarget').name('Reposition Target').onChange(v => { spider_controller.setDebugRepositionTargetVisible(v); });
+debugFolder.add(debug_params, 'meshVisibility').name('Mesh Visibility').onChange(v => { spider_rig.setMeshVisibility(v); });
 
 spider_controller.setDebugAnchorsVisible(debug_params.anchors);
 spider_controller.setDebugRaycastHitsVisible(debug_params.raycastHits);

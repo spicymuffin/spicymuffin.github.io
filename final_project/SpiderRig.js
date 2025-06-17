@@ -85,26 +85,30 @@ export class SpiderRig {
                     this.bone_levels[level - 1][lr][i].add(bone);
                     this.bone_levels[level][lr].push(bone);
 
-                    // if (options.sharedMesh) {
-                    //     const mesh = options.sharedMesh.clone();
+                    if (options.sharedMesh && level <= 3) {
+                        const mesh = options.sharedMesh.clone();
+                        mesh.name = "limb_mesh";
+                        mesh.castShadow = true;
 
-                    //     mesh.lookAt(0, 1, 0);
-                    //     mesh.scale.set(5, 3, 2.5);
+                        mesh.lookAt(0, 1, 0);
+                        mesh.scale.set(3, 3, 2.5);
 
-                    //     switch (level) {
-                    //         case 1:
-                    //             mesh.position.set(0, 0.5, 0);
-                    //             break;
-                    //         case 2:
-                    //             mesh.scale.set(5, 2.5, 2);
-                    //             mesh.rotateX(Math.PI / 4);
-                    //             break;
-                    //         case 4:
-                    //             mesh.position.set(0, -0.5, 0);
-                    //             break;
-                    //     }
-                    //     bone.add(mesh);
-                    // }
+                        switch (level) {
+                            case 1:
+                                mesh.position.set(0, 0.7700400766937223, 0);
+                                mesh.scale.set(3, 3, 2.9432039515149433);
+                                break;
+                            case 2:
+                                mesh.position.set(0, 0.53, 0);
+                                mesh.scale.set(3, 3, 1.84);
+                                break;
+                            case 3:
+                                mesh.position.set(0, 0.3526108097987435, 0);
+                                mesh.scale.set(3, 3, 1.55589944222246);
+                                break;
+                        }
+                        bone.add(mesh);
+                    }
                 }
             }
         }
@@ -137,32 +141,35 @@ export class SpiderRig {
                 opacity: 0.8,
             });
 
+            // PATCH HERE
             // since all the children of level 0 are only one per level, we can recursively add the visualizations
             for (let lr = 0; lr < 2; lr++) {
                 for (let i = 0; i < this.bone_levels[0][lr].length; i++) {
                     function recursive_step(bone) {
-                        if (bone.children.length > 0) {
+                        let nextBone = null;
+                        for (const child of bone.children) {
+                            if (child instanceof THREE.Bone) {
+                                nextBone = child;
+                                break;
+                            }
+                        }
+
+                        if (nextBone) {
                             boneutils.addBoneVis(bone, {
                                 color: colors.blue,
                                 sphere_radius: 0.1,
                                 axis: true,
-                                child: bone.children[0],
+                                child: nextBone,
                                 thickness: 0.08,
                             });
-                            recursive_step(bone.children[0]);
-                        }
-                        else {
-                            boneutils.addBoneVis(bone, {
-                                color: colors.red,
-                                sphere_radius: 0.1,
-                                axis: true,
-                            });
+                            recursive_step(nextBone);
                         }
                     }
 
                     recursive_step(this.bone_levels[0][lr][i]);
                 }
             }
+            // PATCH HERE
         }
 
         this.parent_ref.updateMatrixWorld();
@@ -247,24 +254,56 @@ export class SpiderRig {
         }
     }
 
+    setMeshVisibility(visible) {
+        if (!this.debug) return;
+
+        function recursive_step(bone) {
+            if (bone.children.length > 0) {
+                let bonechild = null;
+                for (const child of bone.children) {
+                    if (child.name == "limb_mesh") {
+                        child.visible = visible;
+                    }
+                    else if (!(child instanceof THREE.Mesh || child.name == "bone_axis")) {
+                        bonechild = child;
+                    }
+                }
+                if (bonechild != null) {
+                    recursive_step(bonechild);
+                }
+            }
+            else {
+                for (const child of bone.children) {
+                    if (child instanceof THREE.Mesh) {
+                        child.visible = visible;
+                    }
+                }
+            }
+        }
+
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const static_bone = this.bone_levels[0][lr][i];
+                recursive_step(static_bone);
+            }
+        }
+    }
+
     setDebugBonesVisible(visible) {
         if (!this.debug) return;
 
         function recursive_step(bone) {
             if (bone.children.length > 0) {
-                console.log("entering level with children", bone.name);
                 let bonechild = null;
                 for (const child of bone.children) {
-                    if (child instanceof THREE.Mesh || child.name == "bone_axis") {
+                    if ((child instanceof THREE.Mesh || child.name == "bone_axis") && child.name != "limb_mesh") {
                         child.visible = visible;
-                        console.log(`Setting visibility of ${child.name} to ${visible}`);
                     }
                     else {
                         bonechild = child;
                     }
                 }
                 if (bonechild != null) {
-                    console.warn("entering child bone", bonechild.name);
                     recursive_step(bonechild);
                 }
             }

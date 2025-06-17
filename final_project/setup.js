@@ -137,8 +137,8 @@ export function initDefaultDirectionalLighting(scene, initialPosition) {
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.copy(position);
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.mapSize.width = 4096;
+    dirLight.shadow.mapSize.height = 4096;
     dirLight.castShadow = true;
 
     dirLight.shadow.camera.left = -200;
@@ -149,6 +149,7 @@ export function initDefaultDirectionalLighting(scene, initialPosition) {
     scene.add(dirLight);
 
     const ambientLight = new THREE.AmbientLight(0x343434);
+    ambientLight.intensity = 5;
     ambientLight.name = "ambientLight";
     scene.add(ambientLight);
 }
