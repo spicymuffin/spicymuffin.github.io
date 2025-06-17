@@ -17,6 +17,8 @@ export class SpiderRig {
         this.parent_ref = parent_ref;
         this.debug = options.debug ?? false;
 
+        this.bone_visualizers = [];
+
         // create the rig
         // no ascii art, consult an image that hopefully someone has drawn...
 
@@ -83,26 +85,26 @@ export class SpiderRig {
                     this.bone_levels[level - 1][lr][i].add(bone);
                     this.bone_levels[level][lr].push(bone);
 
-                    if (options.sharedMesh) {
-                        const mesh = options.sharedMesh.clone();
+                    // if (options.sharedMesh) {
+                    //     const mesh = options.sharedMesh.clone();
 
-                        mesh.lookAt(0, 1, 0);
-                        mesh.scale.set(5, 3, 2.5);
+                    //     mesh.lookAt(0, 1, 0);
+                    //     mesh.scale.set(5, 3, 2.5);
 
-                        switch(level){
-                            case 1:
-                                mesh.position.set(0, 0.5, 0);
-                                break;
-                            case 2:
-                                mesh.scale.set(5, 2.5, 2);
-                                mesh.rotateX(Math.PI / 4);
-                                break;
-                            case 4:
-                                mesh.position.set(0, -0.5, 0);
-                                break;
-                        }
-                        bone.add(mesh);
-                    }
+                    //     switch (level) {
+                    //         case 1:
+                    //             mesh.position.set(0, 0.5, 0);
+                    //             break;
+                    //         case 2:
+                    //             mesh.scale.set(5, 2.5, 2);
+                    //             mesh.rotateX(Math.PI / 4);
+                    //             break;
+                    //         case 4:
+                    //             mesh.position.set(0, -0.5, 0);
+                    //             break;
+                    //     }
+                    //     bone.add(mesh);
+                    // }
                 }
             }
         }
@@ -126,7 +128,7 @@ export class SpiderRig {
 
         // add bonevisualizations for the bones
         if (this.debug) {
-            boneutils.addBoneVis(this.bone_root, {
+            const root_vis = boneutils.addBoneVis(this.bone_root, {
                 color: colors.green,
                 sphere_radius: 0.15,
                 axis: true,
@@ -188,7 +190,7 @@ export class SpiderRig {
                 this.parent_ref.add(target);
                 this.targets[lr].push(target);
 
-                if(!this.debug){
+                if (!this.debug) {
                     target.visible = false;
                 }
             }
@@ -218,7 +220,7 @@ export class SpiderRig {
                 this.parent_ref.add(pole);
                 this.poles[lr].push(pole);
 
-                if(!this.debug){
+                if (!this.debug) {
                     pole.visible = false;
                 }
             }
@@ -235,12 +237,83 @@ export class SpiderRig {
                     {}, // constraints
                     {
                         pole: this.poles[lr][i],
-                        debug: false,
+                        debug: this.debug,
                     } // options
                 );
 
                 chain.name = `spider_limb_${lr ? 'r' : 'l'}_${i}_chain`;
                 this.ik_chains[lr].push(chain);
+            }
+        }
+    }
+
+    setDebugBonesVisible(visible) {
+        if (!this.debug) return;
+
+        function recursive_step(bone) {
+            if (bone.children.length > 0) {
+                console.log("entering level with children", bone.name);
+                let bonechild = null;
+                for (const child of bone.children) {
+                    if (child instanceof THREE.Mesh || child.name == "bone_axis") {
+                        child.visible = visible;
+                        console.log(`Setting visibility of ${child.name} to ${visible}`);
+                    }
+                    else {
+                        bonechild = child;
+                    }
+                }
+                if (bonechild != null) {
+                    console.warn("entering child bone", bonechild.name);
+                    recursive_step(bonechild);
+                }
+            }
+            else {
+                for (const child of bone.children) {
+                    if (child instanceof THREE.Mesh) {
+                        child.visible = visible;
+                    }
+                }
+            }
+        }
+
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const static_bone = this.bone_levels[0][lr][i];
+                recursive_step(static_bone);
+            }
+        }
+
+        this.bone_root.children.forEach(child => {
+            if (child instanceof THREE.Mesh || child.name == "bone_axis") {
+                child.visible = visible;
+            }
+        });
+    }
+
+    setDebugPolesVisible(visible) {
+        if (!this.debug) return;
+        for (const lr_poles of this.poles) {
+            for (const pole of lr_poles) {
+                pole.visible = visible;
+            }
+        }
+    }
+
+    setDebugTargetsVisible(visible) {
+        if (!this.debug) return;
+        for (const lr_targets of this.targets) {
+            for (const target of lr_targets) {
+                target.visible = visible;
+            }
+        }
+    }
+
+    setDebugIkProxiesVisible(visible) {
+        if (!this.debug) return;
+        for (const lr_chains of this.ik_chains) {
+            for (const chain of lr_chains) {
+                chain.setDebugVisible(visible);
             }
         }
     }

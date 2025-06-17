@@ -63,9 +63,9 @@ export class IKChain {
             if (i + 1 !== chain_len) {
                 iterator = iterator.parent; // go up the hierarchy to the parent joint IF we are not at the root already
             }
-            if (this.debug) {
-                console.log(`added proxy joint ${i} for ${iterator.name}`);
-            }
+            // if (this.debug) {
+            //     console.log(`added proxy joint ${i} for ${iterator.name}`);
+            // }
         }
 
         this.anchor_bone_ref = iterator; // the last joint in the chain is the anchor bone
@@ -130,6 +130,13 @@ export class IKChain {
                     sphere.add(bone);
                 }
             }
+        }
+    }
+
+    setDebugVisible(visible) {
+        if (!this.debug) return;
+        for (const visualizer of this.bone_visualizers) {
+            visualizer.visible = visible;
         }
     }
 

@@ -33,7 +33,8 @@ export function initRenderer(additionalProperties) {
     document.body.appendChild(renderer.domElement);
 
     renderer.sortObjects = true;
-    renderer.toneMapping = THREE.sRGBACurveToneMapping;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.NoToneMapping;
     renderer.toneMappingExposure = 1.2;
 
     renderer.sortObjects = true;
@@ -108,16 +109,16 @@ export function initDefaultLighting(scene, initialPosition) {
 
     const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.3);
     directionalLight1.position.copy(position);
-    directionalLight1.shadow.mapSize.width = 2048;
-    directionalLight1.shadow.mapSize.height = 2048;
-    directionalLight1.shadow.camera.fov = 15;
+    directionalLight1.shadow.mapSize.width = 4096;
+    directionalLight1.shadow.mapSize.height = 4096;
+    directionalLight1.shadow.camera.fov = 60;
     directionalLight1.name = "directionalLight1";
     //scene.add(directionalLight1);
 
     const spotLight = new THREE.SpotLight(0xffffff, 5000);
     spotLight.position.copy(position);
-    spotLight.shadow.mapSize.width = 2048;
-    spotLight.shadow.mapSize.height = 2048;
+    spotLight.shadow.mapSize.width = 4096;
+    spotLight.shadow.mapSize.height = 4096;
     spotLight.shadow.camera.fov = 15;
     spotLight.castShadow = true;
     spotLight.decay = 2;

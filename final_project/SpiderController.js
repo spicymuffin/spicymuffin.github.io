@@ -78,7 +78,7 @@ export class SpiderController {
         this.camera_rotation_speed = 5.0; // how fast the camera's orientation follows the spider's roll/pitch
 
         // camera zoom properties
-        this.camera_distance = 6.0; // default camera distance
+        this.camera_distance = 10.0; // default camera distance
         this.min_camera_distance = 2.0; // minimum zoom distance
         this.max_camera_distance = 50.0; // maximum zoom distance
         this.zoom_speed = 0.5; // how fast zoom changes with scroll
@@ -330,6 +330,86 @@ export class SpiderController {
 
         this._bindEvents();
     }
+
+    updateEasingFunction(new_ease_fn) {
+        this.ease_fn = new_ease_fn;
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                this.limb_steppers[lr][i].setEasing(this.ease_fn);
+            }
+        }
+    }
+
+    updateStepDuration(new_duration) {
+        this.time_to_reposition = new_duration;
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                this.limb_steppers[lr][i].setDuration(new_duration);
+            }
+        }
+    }
+
+    updateStepLift(new_lift) {
+        this.lift_amount = new_lift;
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const stepper = this.limb_steppers[lr][i];
+                stepper.lift_amount = new_lift;
+                stepper._compute_control_point();
+            }
+        }
+    }
+
+    updateStepCurve(new_bias) {
+        this.curve_bias = new_bias;
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                const stepper = this.limb_steppers[lr][i];
+                stepper.curve_bias = new_bias;
+                stepper._compute_control_point();
+            }
+        }
+    }
+
+    // Debug Visibility
+
+    setDebugAnchorsVisible(visible) {
+        if (!this.debug || !this.anchor_visualizers) return;
+        for (const lr_anchors of this.anchor_visualizers) {
+            for (const anchor of lr_anchors) {
+                anchor.visible = visible;
+            }
+        }
+    }
+
+    setDebugRaycastHitsVisible(visible) {
+        if (!this.debug || !this.raycaster_hit_visualizers) return;
+        for (const lr_hits of this.raycaster_hit_visualizers) {
+            for (const hit of lr_hits) {
+                hit.visible = visible;
+            }
+        }
+    }
+
+    setDebugRaycastOriginsVisible(visible) {
+        if (!this.debug || !this.raycaster_origins) return;
+        for (const lr_origins of this.raycaster_origins) {
+            for (const origin of lr_origins) {
+                for (const child of origin.children) {
+                    if (child instanceof THREE.Mesh) {
+                        child.visible = visible;
+                    }
+                }
+            }
+        }
+    }
+
+    setDebugRepositionTargetVisible(visible) {
+        if (!this.debug || !this.avg_position_visualizer) return;
+        this.avg_position_visualizer.visible = visible;
+        this.up_vector_visualizer.visible = visible;
+    }
+
 
     lockMouse() {
         this.is_locked = true;
