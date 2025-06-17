@@ -35,11 +35,11 @@ const cameraHelper = new THREE.CameraHelper(spider_camera);
 initDefaultLighting(scene);
 initDefaultDirectionalLighting(scene);
 
-const starCount = 1000; 
-const stars = new THREE.Group(); 
+const starCount = 1000;
+const stars = new THREE.Group();
 
-const starGeometry = new THREE.SphereGeometry(0.05, 8, 8); 
-const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
+const starGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
 // background stars
 for (let i = 0; i < starCount; i++) {
@@ -56,33 +56,25 @@ for (let i = 0; i < starCount; i++) {
 }
 scene.add(stars);
 
-const ground_plane = objutils.createCircularGround();
-ground_plane.position.y = -4;
-ground_plane.position.z = -13;
-scene.add(ground_plane);
-ground_plane.visible = false;
-
-ground_plane.layers.enable(3);
-
-const raycasting_candidates = [ground_plane];
+const raycasting_candidates = [];
 
 // background
 loader.load('blender/background.glb', (gltf) => {
-  const background = gltf.scene;
-  background.traverse(obj => {
-    obj.castShadow = false;
-    obj.receiveShadow = true;
+    const background = gltf.scene;
+    background.traverse(obj => {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
 
-    if (obj.isMesh) {
-        obj.layers.enable(3);
-        raycasting_candidates.push(obj); // background meshes also used in raycasting
-    }
-  });
+        if (obj.isMesh) {
+            obj.layers.enable(3);
+            raycasting_candidates.push(obj);
+        }
+    });
 
-  background.scale.set(5, 5, 5);
-  background.rotation.set(0, Math.PI, 0);
-  background.position.set(0, -5.5, -13);
-  scene.add(background);
+    background.scale.set(5, 5, 5);
+    background.rotation.set(0, Math.PI, 0);
+    background.position.set(0, -5.5, -13);
+    scene.add(background);
 });
 
 const axis = new THREE.AxesHelper(10);
@@ -102,18 +94,6 @@ const Mode = Object.freeze({
 let mode = Mode.editor;
 let camera = editor_camera;
 
-// spider locomomotion overview:
-// 1. user gives some inputs (wasd, mouse). the rotation defines the forward dirction, the wasd keys define the motion relative
-//    to the forward direction
-//    these inputs are applied relative to last frame's location of the spider_camera_root. we want this because the player expects
-//    the spider to move in relation to what he sees on the screen.
-// 2. the position delta and rotation delta are also applied to the raycasting object.
-//    [with a lerping delay. this way, the spider will move smoothly to accommodate the user's inputs.] - no lerping for now, but can be added later...?
-// 3. the raycasting object is used to raycast against the ground plane to find the new position of the spider.
-// 4. the average normal vector of the raycast hits is used to determine the new up direction of the spider_camera_root
-//    this way, in the next frame, the movement/view plane will be aligned with the ground plane
-
-
 let realtime_IK = true;
 
 const spider_movement_root = new THREE.Object3D();
@@ -125,30 +105,25 @@ const robot_head = await loader.loadAsync('blender/robot_head.glb');
 let mesh = null;
 robot_head.scene.traverse((child) => {
     if (child.isMesh && !mesh) {
-        mesh = child.clone(); 
+        mesh = child.clone();
     }
 });
 
 if (mesh) {
-    mesh.scale.set(4, 4, 4); 
+    mesh.scale.set(4, 4, 4);
     mesh.rotation.set(0, -Math.PI / 2, 0);
-    mesh.position.set(0, 0.8, 0); 
-    spider_movement_root.add(mesh); 
+    mesh.position.set(0, 0.8, 0);
+    spider_movement_root.add(mesh);
 }
 
 scene.add(spider_movement_root);
-
-const spider_camera_root = new THREE.Object3D();
-spider_camera_root.name = 'spider_camera_root'
-
-scene.add(spider_camera_root);
 
 const spider_rig_root = new THREE.Object3D();
 spider_rig_root.name = 'spider_rig_root'
 
 scene.add(spider_rig_root);
 
-const spider = [spider_movement_root, spider_camera_root, spider_rig_root];
+const spider = [spider_movement_root, spider_rig_root];
 
 for (let i = 0; i < spider.length; i++) {
     const spider_part = spider[i];
@@ -159,10 +134,10 @@ const robot_arm = await loader.loadAsync('blender/robot_arm.glb');
 
 let sharedMesh = null;
 robot_arm.scene.traverse((child) => {
-  if (child.isMesh && !sharedMesh) {
-    console.log('[Found Mesh]', child.name);
-    sharedMesh = child;
-  }
+    if (child.isMesh && !sharedMesh) {
+        console.log('[Found Mesh]', child.name);
+        sharedMesh = child;
+    }
 });
 
 const spider_rig = new SpiderRig(spider_rig_root,
@@ -181,11 +156,10 @@ const spider_controller = new SpiderController(
     spider_movement_root,
     spider_rig_root,
     spider_rig,
-    spider_camera_root,
     spider_camera,
     renderer.domElement,
     {
-        debug: false,
+        debug: true,
         raycasting_candidates: raycasting_candidates,
     }
 );

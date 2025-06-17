@@ -32,6 +32,12 @@ export function initRenderer(additionalProperties) {
     renderer.antialias = true;
     document.body.appendChild(renderer.domElement);
 
+    renderer.sortObjects = true;
+    renderer.toneMapping = THREE.sRGBACurveToneMapping;
+    renderer.toneMappingExposure = 1.2;
+
+    renderer.sortObjects = true;
+
     return renderer;
 }
 

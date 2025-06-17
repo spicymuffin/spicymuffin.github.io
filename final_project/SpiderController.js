@@ -65,7 +65,7 @@ export class SpiderController {
         this.sensitivity = 0.002;
 
         this.default_speed = 3;
-        this.accel_speed = 8;
+        this.accel_speed = 6;
 
         this.turn_speed = 5.0;
         if (options.turn_speed) {
@@ -333,7 +333,7 @@ export class SpiderController {
 
     lockMouse() {
         this.is_locked = true;
-        // this.dom_element.requestPointerLock();
+        this.dom_element.requestPointerLock();
     }
 
     unlockMouse() {
@@ -437,10 +437,7 @@ export class SpiderController {
     _onMouseDown(e) {
         if (!this.enabled) return;
         if (e.button === 0) { // left mouse button
-            if (!this.is_locked && document.pointerLockElement !== this.dom_element) {
-                this.dom_element.requestPointerLock();
-                this.is_locked = true;
-            }
+            this.lockMouse();
         }
     }
 
@@ -589,24 +586,24 @@ export class SpiderController {
         // calculate the up vector using two cross products from the grounded group of limbs
 
         // hard coded, change later
-        if (grounded_group === 0) {
-            // cross front - back, left - right
-            const front = this.raycast_hit_points[0][0].clone();
-            const back = this.raycast_hit_points[1][3].clone();
-            const left = this.raycast_hit_points[0][2].clone();
-            const right = this.raycast_hit_points[1][1].clone();
-            up_vector.crossVectors(front.sub(back), left.sub(right));
-            up_vector.normalize();
-        }
-        else {
-            // cross front - back, left - right
-            const front = this.raycast_hit_points[1][0].clone();
-            const back = this.raycast_hit_points[0][3].clone();
-            const left = this.raycast_hit_points[0][1].clone();
-            const right = this.raycast_hit_points[1][2].clone();
-            up_vector.crossVectors(front.sub(back), left.sub(right));
-            up_vector.normalize();
-        }
+
+        // cross front - back, left - right
+        const front0 = this.raycast_hit_points[0][0].clone();
+        const back0 = this.raycast_hit_points[1][3].clone();
+        const left0 = this.raycast_hit_points[0][2].clone();
+        const right0 = this.raycast_hit_points[1][1].clone();
+        up_vector.crossVectors(front0.sub(back0), left0.sub(right0));
+
+        // cross front - back, left - right
+        const front1 = this.raycast_hit_points[1][0].clone();
+        const back1 = this.raycast_hit_points[0][3].clone();
+        const left1 = this.raycast_hit_points[0][1].clone();
+        const right1 = this.raycast_hit_points[1][2].clone();
+        up_vector.add(new THREE.Vector3().crossVectors(front1.sub(back1), left1.sub(right1)));
+
+        up_vector.multiplyScalar(0.5); // average the two up vectors
+        up_vector.normalize(); // normalize the up vector
+
         // #endregion
 
         if (this.debug) {

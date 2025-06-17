@@ -14,16 +14,16 @@ export class SpiderLegStepper {
         this._compute_control_point();
 
         // camera section
-        this.camera = camera;
-        this.listener = new THREE.AudioListener();
-        this.camera.add(this.listener);
+        // this.camera = camera;
+        // this.listener = new THREE.AudioListener();
+        // this.camera.add(this.listener);
 
-        this.footstepSound = new THREE.Audio(this.listener);
-        this.audioLoader = new THREE.AudioLoader();
-        this.audioLoader.load('assets/sounds/spider-step.mp3', (buffer) => {
-            this.footstepSound.setBuffer(buffer);
-            this.footstepSound.setVolume(0.4);
-        });
+        // this.footstepSound = new THREE.Audio(this.listener);
+        // this.audioLoader = new THREE.AudioLoader();
+        // this.audioLoader.load('assets/sounds/spider-step.mp3', (buffer) => {
+        //     this.footstepSound.setBuffer(buffer);
+        //     this.footstepSound.setVolume(0.4);
+        // });
         // camera section end
     }
 
@@ -69,10 +69,10 @@ export class SpiderLegStepper {
         // t = Math.max(0, Math.min(1, t));
         if (t > 0.8 && t < 0.9){
             //print sound effect
-            console.log("Footstep sound effect triggered");
-            if (!this.footstepSound.isPlaying) {
-                this.footstepSound.play();
-            }
+            // console.log("Footstep sound effect triggered");
+            // if (!this.footstepSound.isPlaying) {
+            //     this.footstepSound.play();
+            // }
         }
 
         const eased_t = this.ease_fn(t);
