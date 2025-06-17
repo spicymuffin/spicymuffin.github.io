@@ -242,3 +242,19 @@ export function createGroundPlane() {
 
     return plane;
 }
+
+export function createCircularGround(radius = 40, segments = 64) {
+    // create the circular ground plane
+    const circleGeometry = new THREE.CircleGeometry(radius, segments);
+    const circleMaterial = new THREE.MeshPhongMaterial({
+        color: 0xffffff,
+    });
+    const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+    circle.receiveShadow = true;
+
+    // rotate and position the circle to lay flat on XZ plane
+    circle.rotation.x = -0.5 * Math.PI;
+    circle.position.set(0, 0, 0);
+
+    return circle;
+}

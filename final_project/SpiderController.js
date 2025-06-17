@@ -333,7 +333,7 @@ export class SpiderController {
 
     lockMouse() {
         this.is_locked = true;
-        this.dom_element.requestPointerLock();
+        // this.dom_element.requestPointerLock();
     }
 
     unlockMouse() {
@@ -437,7 +437,10 @@ export class SpiderController {
     _onMouseDown(e) {
         if (!this.enabled) return;
         if (e.button === 0) { // left mouse button
-            this.lockMouse();
+            if (!this.is_locked && document.pointerLockElement !== this.dom_element) {
+                this.dom_element.requestPointerLock();
+                this.is_locked = true;
+            }
         }
     }
 
