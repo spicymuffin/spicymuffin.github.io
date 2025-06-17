@@ -27,7 +27,7 @@ const scene = new THREE.Scene();
 const stats = initStats();
 const renderer = initRenderer();
 const editor_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13) });
-const spider_camera = initCamera({ position: new THREE.Vector3(-7, 3, 13), fov: 60 });
+const spider_camera = initCamera({ position: new THREE.Vector3(0, 3, 8), fov: 60 });
 const clock = new THREE.Clock();
 
 const cameraHelper = new THREE.CameraHelper(spider_camera);
@@ -140,8 +140,9 @@ scene.add(spider_movement_root);
 
 const spider_camera_root = new THREE.Object3D();
 spider_camera_root.name = 'spider_camera_root'
-
 scene.add(spider_camera_root);
+
+spider_camera_root.add(spider_camera);
 
 const spider_rig_root = new THREE.Object3D();
 spider_rig_root.name = 'spider_rig_root'
@@ -197,9 +198,11 @@ function switchMode() {
         camera = spider_camera;
 
         spider_controller.enable();
-
         editor_controller.disable();
         transform_manipulator.disable();
+
+        spider_camera.rotation.set(0, 0, 0);
+        spider_camera.lookAt(spider_rig_root.position);
     }
     // spider -> editor
     else {
