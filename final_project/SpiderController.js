@@ -153,7 +153,7 @@ export class SpiderController {
         }
 
         const default_z_offset = 3;
-        const default_y_offset = 2;
+        const default_y_offset = 3;
 
         this.oy_angles = options.oy_angles || [Math.PI / 16, Math.PI / 7 * 3, Math.PI / 7 * 4, Math.PI / 9 * 7];
         this.raycaster_z_offsets = options.raycaster_z_offsets || [default_z_offset, default_z_offset, default_z_offset, default_z_offset];
@@ -192,7 +192,7 @@ export class SpiderController {
                 const raycaster_object = new THREE.Raycaster();
                 // set the raycaster near and far for performance
                 raycaster_object.near = 0;
-                raycaster_object.far = 10; // far enough to reach the ground
+                raycaster_object.far = 11; // far enough to reach the ground
                 // dont set the origin, direction. because they are world space, we need to convert the local space to world space
                 // every frame
                 raycaster_object.layers.set(walkable_layer); // walkable layer is 3
