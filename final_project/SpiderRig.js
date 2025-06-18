@@ -46,6 +46,11 @@ export class SpiderRig {
 
         this.ik_anchors = [[], []];
 
+        this.pole_distance_multiplier = options.pole_distance_multiplier ?? 5.0;
+        this.pole_vertical_offset = options.pole_vertical_offset ?? 5.0;
+
+        this.pole_additional_offset = new THREE.Vector3(0, 0, 0);
+
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
                 const bone = new THREE.Bone();
@@ -442,8 +447,10 @@ export class SpiderRig {
                 center_anchor.normalize();
                 center_target.normalize();
 
-                const pole_pos = new THREE.Vector3().copy(center_pos).add(center_target.multiplyScalar(5));
-                pole_pos.y += target_pos.y + 5;
+                const pole_pos = new THREE.Vector3().copy(center_pos).add(center_target.multiplyScalar(this.pole_distance_multiplier));
+                pole_pos.y += target_pos.y + this.pole_vertical_offset;
+
+                pole_pos.add(this.pole_additional_offset);
 
                 this.poles[lr][i].position.copy(pole_pos);
             }

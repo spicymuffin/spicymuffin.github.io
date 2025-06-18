@@ -29,9 +29,26 @@ export class SpiderController {
             this.limb_offset_thresholds = options.limb_offset_thresholds;
         }
 
+        this.predictive_step_distance = 0.4; // distance to predict the next step
+        if (options.predictive_step_distance) {
+            this.predictive_step_distance = options.predictive_step_distance;
+        }
+
         this.time_to_reposition = 0.20; // seconds to reposition the limb
         if (options.time_to_reposition) {
             this.time_to_reposition = options.time_to_reposition;
+        }
+
+        // delay between individual leg steps in the same group for a more natural gait
+        this.step_delay = 0.02; // seconds between each leg in a group starts moving
+        if (options.step_delay) {
+            this.step_delay = options.step_delay;
+        }
+
+        // randomness to add to the step delay
+        this.step_delay_randomness = 0.00; // +/- randomness in seconds
+        if (options.step_delay_randomness) {
+            this.step_delay_randomness = options.step_delay_randomness;
         }
 
         this.lift_amount = 0.7; // how much to lift the leg when repositioning
@@ -316,6 +333,7 @@ export class SpiderController {
                         lift_amount: this.lift_amount, // how much to lift the leg
                         curve_bias: this.curve_bias, // how much to curve the step
                         ease_fn: this.ease_fn, // ease function for the step
+                        skip_sound: ((i == 1 || i == 2 || i == 3) ? true : false)
                     }
                 ));
                 this.limb_reposition_flags[lr].push(false); // initialize all flags to false
@@ -602,6 +620,25 @@ export class SpiderController {
         }
     }
 
+    updateRaycasterPositions() {
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                // get the Object3D whose position we need to update
+                const raycaster_origin = this.raycaster_origins[lr][i];
+
+                const theta = (lr ? -1 : 1) * this.oy_angles[i];
+
+                const pos = new THREE.Vector3(
+                    Math.sin(theta) * this.raycaster_z_offsets[i],
+                    this.raycaster_y_offsets[i],
+                    Math.cos(theta) * this.raycaster_z_offsets[i]
+                );
+
+                raycaster_origin.position.copy(pos);
+            }
+        }
+    }
+
     update(delta, now) {
         if (!this.enabled);
 
@@ -635,7 +672,7 @@ export class SpiderController {
         this.spider_movement_root_ref.position.add(world_velocity.multiplyScalar(delta));
 
         // handle the predictive step targets
-        const predictive_velocity = this.velocity.clone().multiplyScalar(-0.2);
+        const predictive_velocity = this.velocity.clone().multiplyScalar(-this.predictive_step_distance);
         this.raycaster_origins_root.position.copy(predictive_velocity);
 
         // update the raycasters
@@ -737,7 +774,6 @@ export class SpiderController {
         const time_since_last_movement = now - this.last_movement_input_ts;
 
         // 1. determine if any leg is currently in the middle of a step
-        // if a step is in progress, we should not trigger a new one
         let step_in_progress = false;
         for (let lr = 0; lr < 2; lr++) {
             for (let i = 0; i < this.limb_count / 2; i++) {
@@ -750,91 +786,105 @@ export class SpiderController {
         }
 
         // 2. if no step is in progress, check if we should start a new one
-        let trigger_new_step = false;
+        let trigger_new_step_group = false;
         if (!step_in_progress) {
-            // the group we would potentially move next is the other group
-            const next_group_to_move = 1 - this.current_moving_group; // 1 - 0 = 1, 1 - 1 = 0
+            const next_group_to_move = 1 - this.current_moving_group;
 
-            // check if any leg in that next group is over-extended or needs to reposition due to rest
             for (let lr = 0; lr < 2; lr++) {
                 for (let i = 0; i < this.limb_count / 2; i++) {
-                    // only check legs belonging to the next potential group
                     if (this.leg_groups[lr][i] === next_group_to_move) {
                         const distance = this.anchors[lr][i].distanceTo(this.raycast_hit_points[lr][i]);
-                        let mult = time_since_last_movement > this.max_time_unrested ? 0.2 : 1.0; // if unrested, shrink the threshold to 10% of the original
+                        let mult = time_since_last_movement > this.max_time_unrested ? 0.2 : 1.0;
+                        mult *= this.inputs.accel ? 0.5 : 1.0;
                         if (!this.look_rest) { mult = 0.1; }
                         const stretched = distance > this.limb_offset_thresholds[lr][i] * mult;
 
                         if (stretched) {
-                            trigger_new_step = true;
+                            trigger_new_step_group = true;
                             break;
                         }
                     }
                 }
-                if (trigger_new_step) break;
-            }
-
-            // if we found a reason to step, switch the active group
-            if (trigger_new_step) {
-                this.current_moving_group = next_group_to_move;
+                if (trigger_new_step_group) break;
             }
         }
 
-        // 3. update all legs: update in-progress steps and starting new ones
-        for (let lr = 0; lr < 2; lr++) {
-            for (let i = 0; i < this.limb_count / 2; i++) {
-                const anchor = this.anchors[lr][i];
-                const hit_point = this.raycast_hit_points[lr][i];
+        // NEW: 3. If a step is triggered, schedule the leg movements with delays.
+        if (trigger_new_step_group) {
+            this.current_moving_group = 1 - this.current_moving_group;
 
-                // ALWAYS update the position of a leg that is currently stepping
-                if (this.limb_reposition_flags[lr][i]) {
-                    const stepper = this.limb_steppers[lr][i];
-                    const elapsed_time = now - this.reposition_start_timestamps[lr][i];
+            const legs_to_move = [];
+            // collect all legs in the new group that need to move
+            for (let lr = 0; lr < 2; lr++) {
+                for (let i = 0; i < this.limb_count / 2; i++) {
+                    if (this.leg_groups[lr][i] === this.current_moving_group) {
+                        const distance = this.anchors[lr][i].distanceTo(this.raycast_hit_points[lr][i]);
+                        let mult = time_since_last_movement > this.max_time_unrested ? 0.2 : 1.0;
+                        mult *= this.inputs.accel ? 0.5 : 1.0;
+                        if (!this.look_rest) { mult = 0.1; }
+                        const stretched = distance > this.limb_offset_thresholds[lr][i] * mult;
 
-                    if (elapsed_time >= stepper.duration) {
-                        // stepper is done, reset the flag and snap the anchor to the final target
-                        this.limb_reposition_flags[lr][i] = false;
-                        this.anchors[lr][i].copy(stepper.to);
-                    }
-                    else {
-                        // update the anchor's position based on the stepper's progress
-                        stepper.getPositionInPlace(elapsed_time, this.anchors[lr][i]);
-                    }
-                }
-
-                // check if we need to START a step for a leg
-                // this can only happen if a new step was triggered for its group
-                const should_this_leg_move_now = trigger_new_step && (this.leg_groups[lr][i] === this.current_moving_group);
-
-                if (should_this_leg_move_now) {
-                    const distance = anchor.distanceTo(hit_point);
-                    let mult = time_since_last_movement > this.max_time_unrested ? 0.2 : 1.0; // if unrested, shrink the threshold to 10% of the original
-                    if (!this.look_rest) { mult = 0.1; }
-                    const stretched = distance > this.limb_offset_thresholds[lr][i] * mult;
-
-                    // only move the legs in the group that are actually stretched or unrested
-                    if (stretched) {
-                        // start repositioning the limb
-                        this.limb_reposition_flags[lr][i] = true;
-                        this.reposition_start_timestamps[lr][i] = now;
-
-                        // configure the stepper for this leg's movement
-                        const stepper = this.limb_steppers[lr][i];
-                        stepper.setFrom(this.anchors[lr][i]);
-                        stepper.setTo(hit_point);
-                        // TODO: replace the up vector with the spider movement root's up vector (world space)
-                        stepper.setUp(up_vector); // up vector for the stepper
-
-                        if (this.debug) {
-                            // update the anchor visualizer target position
-                            this.anchor_visualizers[lr][i].position.copy(hit_point);
+                        if (stretched) {
+                            legs_to_move.push({ lr, i });
                         }
                     }
                 }
             }
+
+            // shuffle for more natural, non-uniform movement
+            for (let i = legs_to_move.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [legs_to_move[i], legs_to_move[j]] = [legs_to_move[j], legs_to_move[i]];
+            }
+
+            // Schedule the steps with delays
+            let step_counter = 0;
+            for (const leg_info of legs_to_move) {
+                const { lr, i } = leg_info;
+                const randomness = (Math.random() - 0.5) * 2 * this.step_delay_randomness;
+                const delay = step_counter * this.step_delay + randomness;
+
+                this.limb_reposition_flags[lr][i] = true;
+                this.reposition_start_timestamps[lr][i] = now + Math.max(0, delay);
+
+                const stepper = this.limb_steppers[lr][i];
+                stepper.setFrom(this.anchors[lr][i]);
+                stepper.setTo(this.raycast_hit_points[lr][i]);
+                stepper.setUp(up_vector);
+
+                step_counter++;
+            }
         }
 
-        // 4. re-translate the IK targets to the updated anchor positions
+        // 4. update all legs: update in-progress steps
+        for (let lr = 0; lr < 2; lr++) {
+            for (let i = 0; i < this.limb_count / 2; i++) {
+                // If a limb is flagged for repositioning, update it.
+                if (this.limb_reposition_flags[lr][i]) {
+                    // But only start moving if its scheduled time has come.
+                    if (now < this.reposition_start_timestamps[lr][i]) {
+                        continue;
+                    }
+
+                    const stepper = this.limb_steppers[lr][i];
+                    const elapsed_time = now - this.reposition_start_timestamps[lr][i];
+
+                    if (elapsed_time >= stepper.duration) {
+                        // Stepper is done, reset the flag and snap the anchor.
+                        this.limb_reposition_flags[lr][i] = false;
+                        this.anchors[lr][i].copy(stepper.to);
+                        if (this.debug) this.anchor_visualizers[lr][i].position.copy(stepper.to);
+                    } else {
+                        // Update the anchor's position based on the stepper's progress.
+                        stepper.getPositionInPlace(elapsed_time, this.anchors[lr][i]);
+                        if (this.debug) this.anchor_visualizers[lr][i].position.copy(this.anchors[lr][i]);
+                    }
+                }
+            }
+        }
+
+
+        // 5. re-translate the IK targets to the updated anchor positions
         this.spider_rig_obj_ref.setTargetPositions(this.anchors);
 
         this.last_up_vector.set(0, 1, 0).applyQuaternion(this.camera_rig.quaternion);

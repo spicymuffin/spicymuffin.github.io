@@ -11,20 +11,34 @@ export class SpiderLegStepper {
         this.curve_bias = options.curve_bias ?? 0.5;
         this.ease_fn = options.ease_fn ?? (t => t * (2 - t));
 
+        this.skip_sound = options.skip_sound ?? false;
+
         this._compute_control_point();
 
-        // camera section
-        // this.camera = camera;
-        // this.listener = new THREE.AudioListener();
-        // this.camera.add(this.listener);
+        // camera and audio
+        this.camera = camera;
+        this.listener = new THREE.AudioListener();
+        this.camera.add(this.listener);
 
-        // this.footstepSound = new THREE.Audio(this.listener);
-        // this.audioLoader = new THREE.AudioLoader();
-        // this.audioLoader.load('assets/sounds/spider-step.mp3', (buffer) => {
-        //     this.footstepSound.setBuffer(buffer);
-        //     this.footstepSound.setVolume(0.4);
-        // });
-        // camera section end
+        this.audioLoader = new THREE.AudioLoader();
+
+        // preload all footstep sounds
+        this.footstepSounds = [];
+        this.footstepBuffers = [];
+        const soundCount = 5;
+        let loadedCount = 0;
+
+        for (let i = 1; i <= soundCount; i++) {
+            this.audioLoader.load(`assets/sounds/step${i}.wav`, (buffer) => {
+                this.footstepBuffers[i - 1] = buffer;
+                loadedCount++;
+                if (loadedCount === soundCount) {
+                    console.log("all footstep sounds preloaded.");
+                }
+            });
+        }
+
+        this._hasPlayedThisStep = false;
     }
 
     _compute_control_point() {
@@ -66,17 +80,16 @@ export class SpiderLegStepper {
     getPositionInPlace(elapsed_time, out) {
         let t = elapsed_time / this.duration;
 
-        // t = Math.max(0, Math.min(1, t));
-        if (t > 0.8 && t < 0.9){
-            //print sound effect
-            // console.log("Footstep sound effect triggered");
-            // if (!this.footstepSound.isPlaying) {
-            //     this.footstepSound.play();
-            // }
+        if (t > 0.8 && t < 0.9) {
+            if (this.skip_sound == false) {
+                this._playRandomFootstep();
+            }
+            this._hasPlayedThisStep = true;
+        } else if (t >= 0.9) {
+            this._hasPlayedThisStep = false; // reset for next step
         }
 
         const eased_t = this.ease_fn(t);
-
         const one_minus_t = 1 - eased_t;
 
         const a = one_minus_t * one_minus_t;
@@ -90,5 +103,16 @@ export class SpiderLegStepper {
         );
 
         return out;
+    }
+
+    _playRandomFootstep() {
+        if (this.footstepBuffers.length > 0) {
+            const index = Math.floor(Math.random() * this.footstepBuffers.length);
+            const buffer = this.footstepBuffers[index];
+            const sound = new THREE.Audio(this.listener);
+            sound.setBuffer(buffer);
+            sound.setVolume(0.1);
+            sound.play();
+        }
     }
 }

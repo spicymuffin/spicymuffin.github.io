@@ -94,6 +94,7 @@ export function initCamera(options = {}) {
     }
 
     const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 100000);
+    camera.name = "camera";
 
     camera.position.copy(position);
 

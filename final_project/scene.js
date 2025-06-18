@@ -30,6 +30,7 @@ const easingFunctions = {
 };
 
 const loader = new GLTFLoader();
+const listener = new THREE.AudioListener();
 
 const gui = new GUI();
 gui.domElement.style.position = 'absolute';
@@ -109,11 +110,20 @@ loader.load('blender/background.glb', (gltf) => {
     scene.add(background);
 });
 
-const axis = new THREE.AxesHelper(10);
-axis.position.set(0, 0, 0);
-axis.raycast = () => { };
-scene.add(axis);
-axis.visible = false;
+const ambient_sound = new THREE.Audio(listener);
+const audioLoader = new THREE.AudioLoader();
+audioLoader.load('assets/sounds/ambient.mp3', (buffer) => {
+    ambient_sound.setBuffer(buffer);
+    ambient_sound.setLoop(true);
+    ambient_sound.setVolume(0.5);
+    ambient_sound.play();
+});
+
+// const axis = new THREE.AxesHelper(10);
+// axis.position.set(0, 0, 0);
+// axis.raycast = () => { };
+// scene.add(axis);
+// axis.visible = false;
 
 const editor_controller = new EditorController(editor_camera, renderer.domElement, { look_at: new THREE.Vector3(0, 0, 0) });
 const transform_manipulator = new TransformManipulator(scene, editor_camera, renderer.domElement, editor_controller, { mode: 'translate' });
@@ -258,14 +268,82 @@ thresholdsFolder.add(threshold_params, 'pair_3', 0.01, 5.0).name('Rear Pair (3)'
 
 thresholdsFolder.close();
 
+const poleFolder = gui.addFolder('IK Pole Control');
+
+poleFolder.add(spider_rig, 'pole_distance_multiplier', 0, 20).name('Pole Distance');
+poleFolder.add(spider_rig, 'pole_vertical_offset', -5, 20).name('Pole Height Offset');
+
+const poleOffsetFolder = poleFolder.addFolder('Manual Offset');
+
+poleOffsetFolder.add(spider_rig.pole_additional_offset, 'x', -10, 10).step(0.1);
+poleOffsetFolder.add(spider_rig.pole_additional_offset, 'y', -10, 10).step(0.1);
+poleOffsetFolder.add(spider_rig.pole_additional_offset, 'z', -10, 10).step(0.1);
+
+poleOffsetFolder.close();
+
+poleFolder.close();
+
+// proxy object to control the raycaster offset arrays
+const raycaster_params = {
+    radius_0: spider_controller.raycaster_z_offsets[0],
+    radius_1: spider_controller.raycaster_z_offsets[1],
+    radius_2: spider_controller.raycaster_z_offsets[2],
+    radius_3: spider_controller.raycaster_z_offsets[3],
+    height_0: spider_controller.raycaster_y_offsets[0],
+    height_1: spider_controller.raycaster_y_offsets[1],
+    height_2: spider_controller.raycaster_y_offsets[2],
+    height_3: spider_controller.raycaster_y_offsets[3],
+};
+
+const raycasterFolder = gui.addFolder('Raycaster Placement');
+
+const radiusFolder = raycasterFolder.addFolder('Radius (from center)');
+radiusFolder.add(raycaster_params, 'radius_0', 0, 10).name('Front Pair').onChange(v => {
+    spider_controller.raycaster_z_offsets[0] = v;
+    spider_controller.updateRaycasterPositions();
+});
+radiusFolder.add(raycaster_params, 'radius_1', 0, 10).name('Mid-Front Pair').onChange(v => {
+    spider_controller.raycaster_z_offsets[1] = v;
+    spider_controller.updateRaycasterPositions();
+});
+radiusFolder.add(raycaster_params, 'radius_2', 0, 10).name('Mid-Rear Pair').onChange(v => {
+    spider_controller.raycaster_z_offsets[2] = v;
+    spider_controller.updateRaycasterPositions();
+});
+radiusFolder.add(raycaster_params, 'radius_3', 0, 10).name('Rear Pair').onChange(v => {
+    spider_controller.raycaster_z_offsets[3] = v;
+    spider_controller.updateRaycasterPositions();
+});
+
+const heightFolder = raycasterFolder.addFolder('Height (from body)');
+heightFolder.add(raycaster_params, 'height_0', -5, 5).name('Front Pair').onChange(v => {
+    spider_controller.raycaster_y_offsets[0] = v;
+    spider_controller.updateRaycasterPositions();
+});
+heightFolder.add(raycaster_params, 'height_1', -5, 5).name('Mid-Front Pair').onChange(v => {
+    spider_controller.raycaster_y_offsets[1] = v;
+    spider_controller.updateRaycasterPositions();
+});
+heightFolder.add(raycaster_params, 'height_2', -5, 5).name('Mid-Rear Pair').onChange(v => {
+    spider_controller.raycaster_y_offsets[2] = v;
+    spider_controller.updateRaycasterPositions();
+});
+heightFolder.add(raycaster_params, 'height_3', -5, 5).name('Rear Pair').onChange(v => {
+    spider_controller.raycaster_y_offsets[3] = v;
+    spider_controller.updateRaycasterPositions();
+});
+
+
+raycasterFolder.close();
+
 
 const debug_params = {
     anchors: false,
     raycastHits: false,
     ikTargets: false,
     ikPoles: false,
-    ikProxies: true,
-    bones: true,
+    ikProxies: false,
+    bones: false,
     raycastOrigins: false,
     repositionTarget: false,
     meshVisibility: true,
@@ -299,8 +377,15 @@ gaitFolder.close();
 thresholdsFolder.close();
 
 
+document.addEventListener('click', () => {
+    if (!ambient_sound.isPlaying) {
+        ambient_sound.play();
+    }
+});
+
 
 function switchMode() {
+    listener.parent?.remove(listener);
     // editor -> spider
     if (mode === Mode.editor) {
         mode = Mode.spider;
@@ -310,6 +395,8 @@ function switchMode() {
 
         editor_controller.disable();
         transform_manipulator.disable();
+
+        camera.add(listener);
     }
     // spider -> editor
     else {
@@ -320,6 +407,8 @@ function switchMode() {
         transform_manipulator.enable();
 
         spider_controller.disable();
+
+        camera.add(listener);
     }
 }
 
@@ -343,18 +432,6 @@ const test_obj = objutils.createBox({
 });
 scene.add(test_obj);
 test_obj.visible = false;
-
-const stepper = new SpiderLegStepper(
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(5, 2, 5),
-    new THREE.Vector3(0, 1, 0),
-    0.2,
-    {
-        lift_amount: 3,
-        curve_bias: 0.7,
-        ease_fn: (t) => t * (2 - t), // ease in-out
-    }
-);
 
 const actions = {
     runSolver: () => {

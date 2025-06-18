@@ -272,18 +272,18 @@ const test_obj = objutils.createBox({
     position: new THREE.Vector3(0, 0, 0),
 });
 scene.add(test_obj);
-const stepper = new SpiderLegStepper(
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(5, 2, 5),
-    new THREE.Vector3(0, 1, 0),
-    0.2,
-    spider_camera,
-    {
-        lift_amount: 3,
-        curve_bias: 0.7,
-        ease_fn: (t) => t * (2 - t), // ease in-out
-    }
-);
+// const stepper = new SpiderLegStepper(
+//     new THREE.Vector3(0, 0, 0),
+//     new THREE.Vector3(5, 2, 5),
+//     new THREE.Vector3(0, 1, 0),
+//     0.2,
+//     spider_camera,
+//     {
+//         lift_amount: 3,
+//         curve_bias: 0.7,
+//         ease_fn: (t) => t * (2 - t), // ease in-out
+//     }
+// );
 
 const actions = {
     runSolver: () => {
